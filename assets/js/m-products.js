@@ -75,15 +75,15 @@
       { k: 'sellIn', l: `${pl[0]} satış fiyatı (${CS.db.settings.priceIncludesKdv ? 'KDV dahil' : 'KDV hariç'})`, t: 'money', req: !p.autoPrice, w: 'third', ro: locked },
       ...dl.flatMap((n, i) => (cc ? [{ k: 'dm' + i, l: n + ' kâr marjı %', t: 'number', w: 'sixth' }] : []).concat([{ k: 'dp' + i, l: n + ' satış fiyatı', t: 'money', w: cc ? 'sixth' : 'third', ro: locked }])),
       { k: 'otv', l: 'ÖTV %', t: 'number', w: 'third' },
+      ...(isNew ? [{ t: 'sep', l: 'İlk alım — stok girişi' }, { k: 'openStock', l: 'Alınan miktar (stoğa girecek)', t: 'number', w: 'third', help: 'Ürünü ilk kez alıyorsanız aldığınız adedi yazın; yukarıdaki alış fiyatıyla stoğa girer' }, { k: 'openWh', l: 'Girileceği depo', t: 'select', opts: CS.whOptions(), w: 'third' }, ...(cc ? [{ k: 'openInv', l: 'Ana tedarikçi seçiliyse alış faturası oluştur (cari borçlanır)', t: 'check', w: 'full' }] : [])] : []),
       { t: 'sep', l: 'Stok' },
       { k: 'critical', l: 'Kritik stok seviyesi', t: 'number', w: 'third' }, { k: 'maxStock', l: 'Azami stok', t: 'number', w: 'third' }, { k: 'scaleCode', l: 'Terazi PLU kodu', w: 'third', help: 'Tartılı ürünlerde terazi barkodundaki ürün kodu' },
-      ...(isNew ? [{ k: 'openStock', l: 'Açılış stoğu', t: 'number', w: 'third' }, { k: 'openWh', l: 'Açılış deposu', t: 'select', opts: CS.whOptions(), w: 'third' }] : []),
       { k: 'service', l: 'Hizmet / stoksuz ürün', t: 'check', w: 'third' }, { k: 'quick', l: 'Hızlı satış ekranında göster', t: 'check', w: 'third' }, { k: 'active', l: 'Aktif', t: 'check', w: 'third' },
       { k: 'online', l: 'B2B katalogda ve e-ticarette yayınla', t: 'check', w: 'third' },
       { t: 'sep', l: 'Açıklama ve görsel' },
       { k: 'desc', l: 'Açıklama', t: 'textarea', w: 'full' }
     ];
-    const data = Object.assign({}, p, { barcodes: (p.barcodes || []).join(', '), kdv: String(p.kdv ?? CS.db.settings.defaultKdv), cur: cur0, buyIn: fx0 ? p.buyFx ?? '' : p.buy ?? '', sellIn: fx0 && !p.autoPrice ? p.sellFx ?? '' : p.sell ?? '', margin: p.margin ?? '' });
+    const data = Object.assign({}, p, { barcodes: (p.barcodes || []).join(', '), kdv: String(p.kdv ?? CS.db.settings.defaultKdv), cur: cur0, buyIn: fx0 ? p.buyFx ?? '' : p.buy ?? '', sellIn: fx0 && !p.autoPrice ? p.sellFx ?? '' : p.sell ?? '', margin: p.margin ?? '', ...(isNew && { openInv: true, openWh: CS.defaultWh() }) });
     dl.forEach((n, i) => { const d = (p.dealers || [])[i] || {}; data['dm' + i] = d.m ?? ''; data['dp' + i] = d.p ?? (fx0 || p.autoPrice ? '' : p.prices?.[i + 1] ?? ''); });
     const f = CS.form(fields, data);
     const extra = document.createElement('div');
@@ -150,11 +150,11 @@
           p.cur = q.cur; p.dealers = q.dealers;
           if (cc) { p.margin = q.margin; p.autoPrice = q.autoPrice; if (q.cur !== '₺') { p.buyFx = q.buyFx; } else { p.buy = q.buy; delete p.buyFx; } }
           if (!q.autoPrice) { if (q.cur !== '₺') p.sellFx = q.sellFx; else { p.sell = q.sell; delete p.sellFx; } }
-          if (cc || !(q.cur !== '₺' || q.autoPrice)) { p.prices = [p.sell].concat(q.dealers.map((d) => (d.p !== '' ? d.p : ''))); }
+          if (q.cur === '₺' && !q.autoPrice) { p.prices = [p.sell].concat(q.dealers.map((d) => (d.p !== '' ? d.p : ''))); }
           CS.applyPricing(p); if (!p.prices?.[0]) p.prices = [p.sell].concat((p.prices || []).slice(1));
           if (old && (CS.num(old.sell) !== CS.num(p.sell) || CS.num(old.buy) !== CS.num(p.buy))) (p.priceHist = p.priceHist || []).push({ at: CS.now(), user: CS.user.name, sellOld: old.sell, sellNew: p.sell, buyOld: cc ? old.buy : undefined, buyNew: cc ? p.buy : undefined });
           p.image = image; p.recipe = rec.filter((r) => r.pid); p.labor = CS.num($('#labor', extra)?.value); p.kit = $('#kit', extra)?.checked;
-          const openStock = v.openStock, openWh = v.openWh; delete p.openStock; delete p.openWh;
+          const openStock = CS.num(v.openStock), openWh = v.openWh; delete p.openStock; delete p.openWh; delete p.openInv;
           if (!p.id) { p.id = 'p_' + CS.uid(); p.stock = {}; p.createdAt = CS.now(); CS.db.products.push(p); }
           else { const i = CS.db.products.findIndex((x) => x.id === p.id); p.stock = CS.db.products[i].stock; CS.db.products[i] = p; }
           // varyantları oluştur / güncelle
@@ -169,7 +169,14 @@
               if (!ex.priceSet) { Object.assign(ex, { cur: p.cur, buyFx: p.buyFx, margin: p.margin, autoPrice: p.autoPrice, sellFx: p.sellFx, dealers: JSON.parse(JSON.stringify(p.dealers || [])), sell: p.sell, buy: p.buy, prices: [...(p.prices || [])], sourceId: p.sourceId }); CS.applyPricing(ex); }
             });
           } else if (!p.variants?.length) { delete p.variantAttrs; }
-          if (openStock && !p.service && !keys.length) CS.addMove({ pid: p.id, wh: openWh, qty: openStock, type: 'acilis', ref: 'open_' + p.id, cost: CS.num(p.buy) });
+          if (openStock > 0 && !p.service && !keys.length) {
+            const wh0 = openWh || CS.defaultWh(); const fxp = p.cur && p.cur !== '₺';
+            if (cc && v.openInv && p.supplierId && CS.num(p.buy) > 0) {
+              const dr = fxp ? CS.rate(p.cur) : 1;
+              CS.postDoc({ type: 'alis', date: CS.today(), cid: p.supplierId, wh: wh0, lines: [{ pid: p.id, name: CS.productName(p), qty: openStock, unit: p.unit || 'Adet', price: fxp ? CS.num(p.buyFx) : CS.num(p.buy), kdv: CS.num(p.kdv), otv: CS.num(p.otv), disc: 0 }], currency: fxp ? p.cur : '₺', rate: dr, status: 'onay', edoc: 'kagit', desc: 'İlk alım: ' + p.name });
+              CS.costChanges = []; CS.toast(`${CS.qty(openStock)} ${p.unit || 'Adet'} stoğa girdi, ${CS.contactName(p.supplierId)} için alış faturası oluşturuldu.`);
+            } else { CS.addMove({ pid: p.id, wh: wh0, qty: openStock, type: 'acilis', ref: 'open_' + p.id, note: 'İlk alım', cost: CS.num(p.buy) }); CS.toast(`${CS.qty(openStock)} ${p.unit || 'Adet'} stoğa girdi.`); }
+          }
           CS.log(isNew ? 'Ürün eklendi' : 'Ürün güncellendi', p.name); CS.save(); CS.refreshBadges();
           onSaved ? onSaved(p) : CS.route();
           if (keys.length && isNew) CS.toast(p.variants.length + ' varyant oluşturuldu. Ürün sayfasından barkod ve stoklarını girin.');

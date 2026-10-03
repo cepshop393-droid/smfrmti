@@ -39,7 +39,9 @@ config.php içinde 'allow_register' => false yapın. 'register_key' doldurursan�
 o anahtarı bilen kişi yeni firma açabilir.
 
 DÖVİZ KURU
-Dolar/euro kuru Harem Altın'dan (ulaşılamazsa TCMB'den) 5 dakikada bir alınır.
+Dolar/euro kuru Harem Altın'dan 5 dakikada bir alınır. Harem Altın sunucunuzu engellerse sırasıyla
+TCMB, Truncgil Finans ve uluslararası kur servisi denenir; hiçbiri olmazsa tarayıcı doğrudan dener.
+Neden alınamadığını görmek için: https://alanadiniz.com/api.php?a=check  -> "rate_errors" satırı.
 Hostinginiz dış bağlantıya izin vermezse Ayarlar > Genel > Döviz kurları bölümünden elle kur girin.
 
 ORTAK BARKOD HAVUZU

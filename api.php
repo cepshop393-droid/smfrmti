@@ -145,6 +145,7 @@ function priceProduct(array $p, array $set, array $rates): array {
     $fm = fn($m) => roundPrice($buy * (1 + (float)$m / 100) * $kdvMul, $set);
     if (!empty($p['autoPrice']) && isset($p['margin']) && $p['margin'] !== '') $p['sell'] = $fm($p['margin']);
     elseif ($fx && (float)($p['sellFx'] ?? 0) && $rate) $p['sell'] = roundPrice((float)$p['sellFx'] * $rate, $set);
+    if ($fx && $rate) $p['fxRate'] = $rate;
     $p['prices'] = $p['prices'] ?? []; $p['prices'][0] = (float)($p['sell'] ?? 0);
     foreach (($p['dealers'] ?? []) as $i => $d) {
         if (!$d) continue;
@@ -167,36 +168,86 @@ function metaSettings(string $cid): array { return record($cid, '_meta', 'settin
 
 /* ---------- Kurlar ---------- */
 function num($v): float { $v = trim((string)$v); if (strpos($v, ',') !== false && strpos($v, '.') !== false) $v = str_replace('.', '', $v); return (float)str_replace(',', '.', $v); }
-function httpPost(string $url, array $fields, array $headers): ?string {
-    if (!function_exists('curl_init')) return null;
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [CURLOPT_POST => true, CURLOPT_POSTFIELDS => http_build_query($fields), CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_ENCODING => '', CURLOPT_HTTPHEADER => $headers, CURLOPT_FOLLOWLOCATION => true]);
-    $r = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch);
-    return $r !== false && $code === 200 ? $r : null;
+const UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36';
+$RATE_ERR = [];
+/** HTTP isteği: curl varsa curl (çerez kavanozu ile), yoksa file_get_contents. Hata nedenini $err'e yazar. */
+function http(string $url, ?array $post = null, array $headers = [], ?string $jar = null, ?string &$err = null): ?string {
+    $err = null;
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        $o = [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_CONNECTTIMEOUT => 5, CURLOPT_ENCODING => '', CURLOPT_FOLLOWLOCATION => true, CURLOPT_MAXREDIRS => 4,
+              CURLOPT_USERAGENT => UA, CURLOPT_HTTPHEADER => array_merge(['Accept-Language: tr-TR,tr;q=0.9,en;q=0.8'], $headers)];
+        if (defined('CURL_IPRESOLVE_V4')) $o[CURLOPT_IPRESOLVE] = CURL_IPRESOLVE_V4;
+        if ($post !== null) { $o[CURLOPT_POST] = true; $o[CURLOPT_POSTFIELDS] = http_build_query($post); }
+        if ($jar) { $o[CURLOPT_COOKIEJAR] = $jar; $o[CURLOPT_COOKIEFILE] = $jar; }
+        curl_setopt_array($ch, $o);
+        $r = curl_exec($ch); $code = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE); $ce = curl_error($ch); curl_close($ch);
+        if ($r === false) { $err = 'bağlantı hatası: ' . $ce; return null; }
+        if ($code !== 200) { $err = 'HTTP ' . $code . (stripos($r, 'cloudflare') !== false ? ' (Cloudflare engeli)' : ''); return null; }
+        return $r;
+    }
+    if (!ini_get('allow_url_fopen')) { $err = 'curl ve allow_url_fopen kapalı'; return null; }
+    $opts = ['http' => ['method' => $post !== null ? 'POST' : 'GET', 'timeout' => 10, 'ignore_errors' => true, 'header' => implode("\r\n", array_merge(['User-Agent: ' . UA], $headers, $post !== null ? ['Content-Type: application/x-www-form-urlencoded'] : []))]];
+    if ($post !== null) $opts['http']['content'] = http_build_query($post);
+    $r = @file_get_contents($url, false, stream_context_create($opts));
+    if ($r === false) { $err = 'bağlantı kurulamadı'; return null; }
+    if (isset($http_response_header[0]) && !preg_match('/\s200\b/', $http_response_header[0])) { $err = $http_response_header[0]; return null; }
+    return $r;
 }
-function httpGet(string $url): ?string {
-    if (function_exists('curl_init')) { $ch = curl_init($url); curl_setopt_array($ch, [CURLOPT_RETURNTRANSFER => true, CURLOPT_TIMEOUT => 8, CURLOPT_FOLLOWLOCATION => true, CURLOPT_USERAGENT => 'Mozilla/5.0 CepStok']); $r = curl_exec($ch); $code = curl_getinfo($ch, CURLINFO_HTTP_CODE); curl_close($ch); return $r !== false && $code === 200 ? $r : null; }
-    $r = @file_get_contents($url); return $r === false ? null : $r;
+function rateErr(string $src, string $msg): void { global $RATE_ERR; $RATE_ERR[$src] = $msg; }
+function okRates(array $o): bool { $u = $o['USD']['satis'] ?? 0; return $u > 1 && $u < 10000; }
+/** Harem Altın JSON'u (data.USDTRY.alis/satis) */
+function parseHarem(?string $h): ?array {
+    if (!$h) return null; $j = json_decode($h, true); $d = $j['data'] ?? $j ?? null; if (!is_array($d) || !isset($d['USDTRY'])) return null;
+    $out = ['source' => 'Harem Altın', 'at' => now()];
+    foreach (['USD' => 'USDTRY', 'EUR' => 'EURTRY', 'GBP' => 'GBPTRY'] as $k => $code) if (isset($d[$code])) $out[$k] = ['alis' => num($d[$code]['alis'] ?? 0), 'satis' => num($d[$code]['satis'] ?? 0)];
+    if (isset($d['ALTIN'])) $out['ALTIN'] = ['alis' => num($d['ALTIN']['alis'] ?? 0), 'satis' => num($d['ALTIN']['satis'] ?? 0)];
+    return okRates($out) ? $out : null;
+}
+function rateHarem(): ?array {
+    $xhr = ['Accept: application/json, text/javascript, */*; q=0.01', 'X-Requested-With: XMLHttpRequest', 'Origin: https://www.haremaltin.com', 'Referer: https://www.haremaltin.com/canli-piyasalar/'];
+    // 1) canlı piyasa JSON dosyası
+    $e = null; $r = parseHarem(http('https://canlipiyasalar.haremaltin.com/tmp/doviz.json?dil_kodu=tr', null, $xhr, null, $e)); if ($r) return $r;
+    $errs = ['json: ' . ($e ?: 'beklenmeyen yanıt')];
+    // 2) ana sayfadan çerez alıp ajax uç noktası
+    $jar = tempnam(sys_get_temp_dir(), 'hrm'); 
+    http('https://www.haremaltin.com/canli-piyasalar/', null, ['Accept: text/html,application/xhtml+xml'], $jar, $e);
+    foreach ([1, 2] as $try) {
+        $r = parseHarem(http('https://www.haremaltin.com/dashboard/ajax/doviz', ['dil_kodu' => 'tr'], array_merge($xhr, ['Content-Type: application/x-www-form-urlencoded; charset=UTF-8']), $jar, $e));
+        if ($r) { @unlink($jar); return $r; }
+        $errs[] = 'ajax: ' . ($e ?: 'beklenmeyen yanıt'); if ($try === 1) usleep(400000);
+    }
+    @unlink($jar); rateErr('Harem Altın', implode(' · ', $errs)); return null;
+}
+function rateTcmb(): ?array {
+    $e = null; $x = http('https://www.tcmb.gov.tr/kurlar/today.xml', null, [], null, $e);
+    if (!$x || !($xml = @simplexml_load_string($x))) { rateErr('TCMB', $e ?: 'XML okunamadı'); return null; }
+    $out = ['source' => 'TCMB', 'at' => now()];
+    foreach ($xml->Currency as $c) { $k = (string)$c['CurrencyCode']; if (in_array($k, ['USD', 'EUR', 'GBP'])) $out[$k] = ['alis' => (float)$c->ForexBuying, 'satis' => (float)$c->ForexSelling]; }
+    if (okRates($out)) return $out; rateErr('TCMB', 'kur bulunamadı'); return null;
+}
+function rateTruncgil(): ?array {
+    $e = null; $h = http('https://finans.truncgil.com/today.json', null, ['Accept: application/json'], null, $e); $j = $h ? json_decode($h, true) : null;
+    if (!is_array($j) || empty($j['USD'])) { rateErr('Truncgil', $e ?: 'beklenmeyen yanıt'); return null; }
+    $g = fn($x, $k) => num($x[$k] ?? $x[str_replace(['ı', 'ş'], ['i', 's'], $k)] ?? 0);
+    $out = ['source' => 'Truncgil Finans', 'at' => now()];
+    foreach (['USD', 'EUR', 'GBP'] as $k) if (!empty($j[$k])) $out[$k] = ['alis' => $g($j[$k], 'Alış'), 'satis' => $g($j[$k], 'Satış')];
+    if (okRates($out)) return $out; rateErr('Truncgil', 'kur bulunamadı'); return null;
+}
+function rateErApi(): ?array {
+    $e = null; $h = http('https://open.er-api.com/v6/latest/USD', null, ['Accept: application/json'], null, $e); $j = $h ? json_decode($h, true) : null; $R = $j['rates'] ?? null;
+    if (!$R || empty($R['TRY'])) { $e2 = null; $h = http('https://api.frankfurter.app/latest?from=USD&to=TRY,EUR,GBP', null, ['Accept: application/json'], null, $e2); $j = $h ? json_decode($h, true) : null; $R = $j['rates'] ?? null; if ($R) $R['USD'] = 1; if (!$R || empty($R['TRY'])) { rateErr('Uluslararası kur', ($e ?: 'yanıt yok') . ' · ' . ($e2 ?: 'yanıt yok')); return null; } }
+    $try = (float)$R['TRY']; $out = ['source' => 'Piyasa ortalaması (ExchangeRate)', 'at' => now()];
+    foreach (['USD', 'EUR', 'GBP'] as $k) if (!empty($R[$k])) { $v = round($try / (float)$R[$k], 4); $out[$k] = ['alis' => $v, 'satis' => $v]; }
+    return okRates($out) ? $out : null;
 }
 function fetchRates(): array {
-    $h = httpPost('https://www.haremaltin.com/dashboard/ajax/doviz', ['dil_kodu' => 'tr'], [
-        'User-Agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0 Safari/537.36',
-        'Accept: application/json, text/javascript, */*; q=0.01', 'Content-Type: application/x-www-form-urlencoded; charset=UTF-8',
-        'X-Requested-With: XMLHttpRequest', 'Origin: https://www.haremaltin.com', 'Referer: https://www.haremaltin.com/canli-piyasalar/']);
-    if ($h) {
-        $j = json_decode($h, true); $d = $j['data'] ?? null;
-        if ($d && isset($d['USDTRY'])) {
-            $out = ['source' => 'Harem Altın', 'at' => now()];
-            foreach (['USD' => 'USDTRY', 'EUR' => 'EURTRY', 'GBP' => 'GBPTRY'] as $k => $code) if (isset($d[$code])) $out[$k] = ['alis' => num($d[$code]['alis']), 'satis' => num($d[$code]['satis'])];
-            if (isset($d['ALTIN'])) $out['ALTIN'] = ['alis' => num($d['ALTIN']['alis']), 'satis' => num($d['ALTIN']['satis'])];
-            if (($out['USD']['satis'] ?? 0) > 0) return $out;
-        }
-    }
-    $x = httpGet('https://www.tcmb.gov.tr/kurlar/today.xml');
-    if ($x && ($xml = @simplexml_load_string($x))) {
-        $out = ['source' => 'TCMB (Harem Altın’a ulaşılamadı)', 'at' => now()];
-        foreach ($xml->Currency as $c) { $k = (string)$c['CurrencyCode']; if (in_array($k, ['USD', 'EUR', 'GBP'])) $out[$k] = ['alis' => (float)$c->ForexBuying, 'satis' => (float)$c->ForexSelling]; }
-        if (($out['USD']['satis'] ?? 0) > 0) return $out;
+    global $RATE_ERR; $RATE_ERR = [];
+    $t0 = microtime(true);
+    foreach (['rateHarem', 'rateTcmb', 'rateTruncgil', 'rateErApi'] as $fn) {
+        if (microtime(true) - $t0 > 22) { rateErr('Zaman aşımı', 'kaynaklar çok yavaş yanıt verdi'); break; }
+        $r = $fn();
+        if ($r) { if ($fn !== 'rateHarem') $r['source'] .= ' (Harem Altın’a ulaşılamadı)'; if ($RATE_ERR) $r['errors'] = $RATE_ERR; return $r; }
     }
     return [];
 }
@@ -324,10 +375,14 @@ case 'rates': {
     global $CFG; auth();
     $c = kvGet('rates'); $force = !empty($in['force']);
     if ($c && !$force && time() - (int)$c['at'] < (int)$CFG['rate_cache_seconds']) out(['ok' => true] + json_decode($c['v'], true));
+    $lf = kvGet('rates_fail');
+    if (!$force && $lf && time() - (int)$lf['at'] < 90) { if ($c) out(['ok' => true, 'stale' => true] + json_decode($c['v'], true)); fail('Kur bilgisi alınamadı (' . $lf['v'] . '). Ayarlar > Döviz kurları bölümünden elle kur girebilirsiniz.', 502); }
     $r = fetchRates();
-    if ($r) { kvSet('rates', json_encode($r)); out(['ok' => true] + $r); }
+    if ($r) { kvSet('rates', json_encode($r, JSON_UNESCAPED_UNICODE)); out(['ok' => true] + $r); }
+    { global $RATE_ERR; $w = []; foreach ($RATE_ERR as $k => $v) $w[] = $k . ': ' . $v; kvSet('rates_fail', mb_substr(implode(' | ', $w), 0, 900)); }
     if ($c) out(['ok' => true, 'stale' => true] + json_decode($c['v'], true));
-    fail('Kur bilgisi alınamadı. Ayarlar > Döviz kurları bölümünden elle kur girebilirsiniz.', 502);
+    global $RATE_ERR; $why = []; foreach ($RATE_ERR as $k => $v) $why[] = $k . ': ' . $v;
+    fail('Kur bilgisi alınamadı (' . implode(' | ', $why) . '). Ayarlar > Döviz kurları bölümünden elle kur girebilirsiniz.', 502);
 }
 
 case 'site': {
@@ -414,7 +469,7 @@ case 'check': {
     // kurulum kontrolü
     $r = ['php' => PHP_VERSION, 'pdo_sqlite' => extension_loaded('pdo_sqlite'), 'pdo_mysql' => extension_loaded('pdo_mysql'), 'curl' => function_exists('curl_init'), 'db' => $CFG['db']];
     try { db(); $r['db_ok'] = true; } catch (Throwable $e) { $r['db_ok'] = false; }
-    $r['rates'] = fetchRates() ? 'ok' : 'ulaşılamadı';
+    global $RATE_ERR; $fr = fetchRates(); $r['rates'] = $fr ? 'ok: ' . $fr['source'] . ' USD ' . ($fr['USD']['satis'] ?? '') : 'ulaşılamadı'; $r['rate_errors'] = $RATE_ERR; $r['allow_url_fopen'] = (bool)ini_get('allow_url_fopen');
     out(['ok' => true] + $r);
 }
 

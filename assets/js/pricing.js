@@ -26,7 +26,7 @@
     if (CS.server && CS.canCost && !CS.canCost()) return p; // maliyeti görmeyen kullanıcıda fiyatlar sunucudan hazır gelir
     const cur = p.cur || '₺'; const fx = cur !== '₺'; const rate = CS.rate(cur);
     if (fx && !rate) return p; // kur yokken mevcut değerleri koru
-    if (fx) p.buy = CS.round(CS.num(p.buyFx) * rate, 4);
+    if (fx) { p.buy = CS.round(CS.num(p.buyFx) * rate, 4); p.fxRate = rate; } else delete p.fxRate;
     const lists = (CS.db?.settings?.priceLists || []).length || 4;
     const kdvMul = CS.db?.settings?.priceIncludesKdv ? 1 + CS.num(p.kdv) / 100 : 1;
     const fromMargin = (m) => roundPrice(CS.num(p.buy) * (1 + CS.num(m) / 100) * kdvMul);
@@ -49,11 +49,29 @@
   let rateTimer;
   CS.loadRates = async function (force) {
     clearTimeout(rateTimer);
+    const use = (r, msg) => { CS.rates = r; CS.ls.set('cepstok:rates', r); CS.applyAllPricing(); CS.rateChip(); if (force) CS.toast(msg || `Kurlar güncellendi (${r.source}).`, r.stale ? 'warn' : undefined, 5000); };
+    let err = '';
     if (CS.server) {
-      try { const r = await CS.api('rates', { force: !!force }, 15000); CS.rates = r; CS.ls.set('cepstok:rates', r); CS.applyAllPricing(); CS.rateChip(); if (force) CS.toast(`Kurlar güncellendi (${r.source}).`); }
-      catch (e) { if (force) CS.toast(e.message, 'bad', 5000); }
-      rateTimer = setTimeout(() => CS.loadRates(), 5 * 60 * 1000);
-    } else { CS.applyAllPricing(); CS.rateChip(); if (force) CS.toast('Sunucu olmadan otomatik kur alınamaz. Ayarlar > Döviz kurları bölümünden elle kur girin.', 'warn', 5000); }
+      try { const r = await CS.api('rates', { force: !!force }, 35000); use(r, r.stale ? `Kur kaynağına ulaşılamadı; son alınan kur kullanılıyor (${CS.dateTime(r.at)}).` : ''); rateTimer = setTimeout(() => CS.loadRates(), 5 * 60 * 1000); return; }
+      catch (e) { err = e.message; }
+    }
+    // sunucu kuru alamazsa tarayıcıdan dene
+    const b = await CS.browserRates();
+    if (b) use(b, `Kurlar tarayıcı üzerinden alındı (${b.source}).`);
+    else if (force) CS.toast((err || 'Otomatik kur alınamadı.') + ' Ayarlar > Döviz kurları bölümünden elle kur girebilirsiniz.', 'bad', 8000);
+    else { CS.applyAllPricing(); CS.rateChip(); }
+    rateTimer = setTimeout(() => CS.loadRates(), 5 * 60 * 1000);
+  };
+  /** Sunucu kur alamadığında tarayıcıdan doğrudan dene (Harem Altın, olmazsa açık kur servisi) */
+  CS.browserRates = async function () {
+    const get = async (url) => { const c = new AbortController(); const t = setTimeout(() => c.abort(), 8000); try { const r = await fetch(url, { signal: c.signal, cache: 'no-store' }); return r.ok ? await r.json() : null; } catch (e) { return null; } finally { clearTimeout(t); } };
+    const n = (v) => { let x = String(v ?? '').trim(); if (x.includes(',') && x.includes('.')) x = x.replace(/\./g, ''); return parseFloat(x.replace(',', '.')) || 0; };
+    const at = new Date().toISOString();
+    const h = await get('https://canlipiyasalar.haremaltin.com/tmp/doviz.json?dil_kodu=tr'); const d = h?.data || h;
+    if (d?.USDTRY && n(d.USDTRY.satis) > 1) { const o = { source: 'Harem Altın (tarayıcı)', at }; [['USD', 'USDTRY'], ['EUR', 'EURTRY'], ['GBP', 'GBPTRY']].forEach(([k, c]) => { if (d[c]) o[k] = { alis: n(d[c].alis), satis: n(d[c].satis) }; }); return o; }
+    const e = await get('https://open.er-api.com/v6/latest/USD'); const R = e?.rates;
+    if (R?.TRY > 1) { const o = { source: 'Piyasa ortalaması (tarayıcı, Harem Altın’a ulaşılamadı)', at }; ['USD', 'EUR', 'GBP'].forEach((k) => { if (R[k]) { const v = CS.round(R.TRY / R[k], 4); o[k] = { alis: v, satis: v }; } }); return o; }
+    return null;
   };
   CS.rateChip = function () {
     const el = $('#ratechip'); if (!el) return; const u = CS.rate('USD'), e = CS.rate('EUR');

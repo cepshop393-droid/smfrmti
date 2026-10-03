@@ -24,7 +24,9 @@
     if (p.variants && p.variants.length) return chooseVariant(p, qty);
     const c = C(); const list = c.list || 0;
     if (!p.service && !CS.db.settings.negativeStock && !c.ret && CS.stockOf(p, wh()) - qty < 0) { CS.toast(`${CS.productName(p)} için stok yetersiz (${CS.qty(CS.stockOf(p, wh()))}).`, 'bad'); return; }
+    if (price == null && p.cur && p.cur !== '₺' && CS.rate(p.cur) && (!CS.server || CS.canCost())) CS.applyPricing(p); // dövizli ürün: güncel kurla TL'ye çevir
     const gp = price ?? CS.grossPrice(p, list);
+    if (price == null && p.cur && p.cur !== '₺' && !CS.rate(p.cur) && !p.fxRate) CS.toast(`${p.cur} kuru alınamadığı için ${CS.productName(p)} fiyatı TL'ye çevrilemedi. Kuru elle girin (üst çubuktaki kur düğmesi).`, 'warn', 6000);
     const ex = c.lines.find((l) => l.pid === p.id && l.price === gp && !l.weighed);
     if (ex && price == null) ex.qty = CS.round(CS.num(ex.qty) + qty, 3); else c.lines.push({ pid: p.id, name: CS.productName(p), qty, price: gp, kdv: CS.num(p.kdv), disc: 0, unit: p.unit || 'Adet', weighed: price != null });
     selLine = c.lines.indexOf(ex || c.lines[c.lines.length - 1]);
@@ -69,7 +71,7 @@
   }
   CS.quickProduct = function (d, cb) {
     const f = CS.form([{ k: 'name', l: 'Ürün adı', req: true, w: 'full' }, { k: 'barcode', l: 'Barkod' }, { k: 'unit', l: 'Birim', t: 'select', opts: CS.db.units }, ...(CS.canCost() ? [{ k: 'buy', l: 'Alış fiyatı (₺, KDV hariç)', t: 'money' }] : []), { k: 'sell', l: 'Satış fiyatı (KDV dahil)', t: 'money', req: true }, { k: 'kdv', l: 'KDV %', t: 'select', opts: CS.KDV_RATES.map(String) }, { k: 'stock', l: 'Açılış stoğu', t: 'number' }], { kdv: String(CS.db.settings.defaultKdv), unit: 'Adet', ...d });
-    CS.modal({ title: 'Hızlı ürün ekle', body: f, buttons: [{ label: 'Vazgeç' }, { label: 'Kaydet', kind: 'primary', onClick: () => { const v = f.read(); if (!v) return false; let cat = ''; if (d.catName) { cat = CS.db.categories.find((c) => c.name === d.catName)?.id; if (!cat) { cat = 'cat_' + CS.uid(); CS.db.categories.push({ id: cat, name: d.catName }); } } const p = { id: 'p_' + CS.uid(), name: v.name, barcode: v.barcode, code: '', cat, unit: v.unit, buy: v.buy || 0, sell: v.sell, kdv: +v.kdv, critical: 0, active: true, stock: {} }; CS.db.products.push(p); if (v.stock) CS.addMove({ pid: p.id, wh: CS.defaultWh(), qty: v.stock, type: 'acilis', ref: 'open_' + p.id }); CS.log('Ürün eklendi', p.name); CS.save(); cb && cb(p); } }] });
+    CS.modal({ title: 'Hızlı ürün ekle', body: f, buttons: [{ label: 'Vazgeç' }, { label: 'Kaydet', kind: 'primary', onClick: () => { const v = f.read(); if (!v) return false; let cat = ''; if (d.catName) { cat = CS.db.categories.find((c) => c.name === d.catName)?.id; if (!cat) { cat = 'cat_' + CS.uid(); CS.db.categories.push({ id: cat, name: d.catName }); } } const p = { id: 'p_' + CS.uid(), name: v.name, barcode: v.barcode, code: '', cat, unit: v.unit, buy: v.buy || 0, sell: v.sell, kdv: +v.kdv, critical: 0, active: true, stock: {} }; CS.db.products.push(p); if (v.stock) CS.addMove({ pid: p.id, wh: CS.defaultWh(), qty: v.stock, type: 'acilis', ref: 'open_' + p.id, note: 'İlk alım', cost: CS.num(p.buy) }); CS.log('Ürün eklendi', p.name); CS.save(); cb && cb(p); } }] });
   };
 
   /* ---------- Çizim ---------- */
