@@ -1,0 +1,10 @@
+{
+  "name": "CepStok — Stok, satış ve ön muhasebe",
+  "short_name": "CepStok",
+  "start_url": "app.html",
+  "display": "standalone",
+  "background_color": "#0F5257",
+  "theme_color": "#0F5257",
+  "lang": "tr",
+  "icons": [{ "src": "assets/img/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }]
+}

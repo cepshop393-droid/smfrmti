@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex,nofollow">
+<title>CepStok yönetim paneli</title>
+<link rel="icon" href="assets/img/icon.svg" type="image/svg+xml">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="assets/css/app.css">
+<style>
+.adm-top{background:var(--ink);color:#fff}
+.adm-top .logo b{font-weight:500;opacity:.7;margin-left:6px;font-stretch:100%;font-size:15px}
+.plan-ed{border:1px solid var(--line);border-radius:10px;padding:14px;background:var(--surface);margin-bottom:12px}
+.plan-ed.hl{border:2px solid var(--brand)}
+.plan-ed header{display:flex;gap:8px;align-items:center;margin-bottom:10px}
+.plan-ed header b{font-size:17px;flex:1}
+.days{font-weight:700}
+.quick{display:flex;flex-wrap:wrap;gap:6px}
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script src="assets/js/core.js"></script>
+<script>
+(function () {
+  const { $, $$, esc, icon } = CS;
+  let T = sessionStorage.getItem('cepstok:sa') || ''; let DATA = null; let tab = 'firms';
+  const api = async (a, body = {}) => {
+    const r = await fetch('api.php?a=' + a, { method: 'POST', headers: { 'Content-Type': 'application/json', ...(T ? { 'X-Admin': T } : {}) }, body: JSON.stringify(body), cache: 'no-store' });
+    let j; try { j = await r.json(); } catch (e) { throw new Error('Sunucu yanıtı okunamadı. PHP çalışıyor mu?'); }
+    if (r.status === 401 && a.startsWith('sa_') && !['sa_login', 'sa_setup'].includes(a)) { T = ''; sessionStorage.removeItem('cepstok:sa'); login(); throw new Error(j.error); }
+    if (!j.ok) throw new Error(j.error || 'Hata'); return j;
+  };
+  const fmtDate = (iso) => (iso ? new Date(iso).toLocaleDateString('tr-TR') : '—');
+  const ago = (iso) => { if (!iso) return '—'; const m = Math.round((Date.now() - new Date(iso)) / 60000); return m < 2 ? 'şimdi' : m < 60 ? m + ' dk önce' : m < 1440 ? Math.round(m / 60) + ' sa önce' : Math.round(m / 1440) + ' gün önce'; };
+  function leftPill(L) {
+    if (L.suspended) return '<span class="pill bad">Askıda</span>';
+    if (L.daysLeft == null) return '<span class="pill ok">Sınırsız</span>';
+    if (L.expired) return `<span class="pill bad">Doldu (${-L.daysLeft} gün)</span>`;
+    return `<span class="pill ${L.daysLeft <= 7 ? 'warn' : 'ok'}">${L.daysLeft} gün kaldı</span>`;
+  }
+
+  async function start() {
+    if (T) { try { await load(); return; } catch (e) { } }
+    login();
+  }
+  async function login() {
+    let st = { setup: false }; try { st = await api('sa_status'); } catch (e) { $('#app').innerHTML = `<div class="login"><div class="login-card"><h2>Sunucuya ulaşılamadı</h2><p>${esc(e.message)}</p></div></div>`; return; }
+    $('#app').innerHTML = `<div class="login"><form class="login-card" id="f"><span class="logo"><i>₺</i><span>CepStok</span></span><h2 style="margin:0">${st.setup ? 'Yönetici hesabını oluşturun' : 'Yönetim paneli'}</h2><p class="muted">${st.setup ? 'Bu sayfa sitenin sahibi içindir. Firmaların kullanım sürelerini ve ana sayfadaki fiyat tablosunu buradan yönetirsiniz. Hesabı şimdi oluşturun; sonradan başkası oluşturamaz.' : 'Site sahibi girişi'}</p><label class="fld full"><span>Kullanıcı adı</span><input id="u" required autocomplete="username"></label><label class="fld full"><span>Şifre${st.setup ? ' (en az 8 karakter)' : ''}</span><input id="p" type="password" required autocomplete="${st.setup ? 'new-password' : 'current-password'}" ${st.setup ? 'minlength="8"' : ''}></label><button class="btn primary">${st.setup ? 'Hesabı oluştur' : 'Giriş yap'}</button></form></div>`;
+    $('#f').onsubmit = async (e) => { e.preventDefault(); try { const r = await api(st.setup ? 'sa_setup' : 'sa_login', { user: $('#u').value, pass: $('#p').value }); T = r.token; sessionStorage.setItem('cepstok:sa', T); await load(); } catch (err) { CS.toast(err.message, 'bad', 5000); } };
+  }
+  async function load() { DATA = await api('sa_dash'); render(); }
+
+  function render() {
+    const C = DATA.companies; const act = C.filter((c) => !c.license.expired && !c.license.suspended);
+    $('#app').innerHTML = `<div class="shell" style="grid-template-columns:1fr"><header class="top adm-top"><span class="logo"><i>₺</i><span>CepStok<b>yönetim</b></span></span><div class="top-acts"><a class="btn sm" href="index.html#fiyat" target="_blank">Ana sayfayı gör</a><button class="icon-btn" id="out" aria-label="Çıkış" style="color:#fff">${icon('out')}</button></div></header>
+      <main id="main"><div class="page"><div class="phead"><h1>Yönetim paneli</h1><nav class="tabs">${[['firms', 'Firmalar ve kullanım süreleri'], ['prices', 'Fiyat tablosu ve paketler'], ['acc', 'Hesabım']].map(([k, l]) => `<a href="#" data-tab="${k}" class="${k === tab ? 'on' : ''}">${l}</a>`).join('')}</nav></div><div id="body"></div></div></main></div>`;
+    $$('[data-tab]').forEach((a) => (a.onclick = (e) => { e.preventDefault(); tab = a.dataset.tab; render(); }));
+    $('#out').onclick = async () => { try { await api('sa_logout'); } catch (e) { } T = ''; sessionStorage.removeItem('cepstok:sa'); login(); };
+    const body = $('#body');
+    if (tab === 'firms') firms(body, C, act); else if (tab === 'prices') prices(body); else account(body);
+  }
+
+  /* ---------- Firmalar ---------- */
+  function firms(body, C, act) {
+    const soon = C.filter((c) => !c.license.expired && c.license.daysLeft != null && c.license.daysLeft <= 7);
+    body.innerHTML = `<div class="kpis">${CS.kpi('Toplam firma', C.length, '', 'hl')}${CS.kpi('Aktif', act.length)}${CS.kpi('7 gün içinde dolacak', soon.length)}${CS.kpi('Süresi dolan / askıda', C.filter((c) => c.license.expired || c.license.suspended).length)}${CS.kpi('Toplam kullanıcı', C.reduce((s, c) => s + c.users, 0))}${CS.kpi('Barkod havuzu', DATA.pool + ' barkod')}</div><div id="ft"></div>`;
+    const opts = {
+      rows: C, ph: 'Firma adı, kodu, telefon…', searchText: (c) => [c.name, c.code, c.phone, c.note].join(' '),
+      tools: `<select id="fs" aria-label="Durum"><option value="">Tüm firmalar</option><option value="active">Aktif</option><option value="soon">7 gün içinde dolacak</option><option value="expired">Süresi dolan</option><option value="suspended">Askıda</option></select>`,
+      cols: [
+        { l: 'Firma', v: (c) => c.name, f: (c) => `<b>${esc(c.name)}</b><small>kod: ${esc(c.code)}${c.phone ? ' · ' + esc(c.phone) : ''}${c.note ? ' · ' + esc(c.note) : ''}</small>` },
+        { l: 'Paket', v: (c) => c.license.planName },
+        { l: 'Kalan süre', v: (c) => (c.license.daysLeft == null ? 1e9 : c.license.daysLeft), f: (c) => leftPill(c.license) },
+        { l: 'Bitiş', v: (c) => c.license.expires || '', f: (c) => fmtDate(c.license.expires) },
+        { l: 'Kullanıcı', a: 'r', v: (c) => c.users, f: (c) => `${c.users}${c.license.maxUsers != null ? ' / ' + c.license.maxUsers : ''}` },
+        { l: 'Ürün', a: 'r', v: (c) => c.products },
+        { l: 'Kayıt', v: (c) => c.created, f: (c) => fmtDate(c.created) },
+        { l: 'Son kullanım', v: (c) => c.lastSeen || '', f: (c) => ago(c.lastSeen) }
+      ],
+      rowClass: (c) => (c.license.suspended || c.license.expired ? 'dim' : ''),
+      onRow: edit,
+      actions: (c) => CS.actBtn('m1', '1 ay uzat', 'plus') + CS.actBtn('ed', 'Düzenle', 'edit') + (c.phone ? `<a class="icon-btn" title="WhatsApp" target="_blank" rel="noopener" href="https://wa.me/${esc(waNum(c.phone))}">${icon('msg')}</a>` : ''),
+      onAct: async (a, c) => { if (a === 'ed') return edit(c); try { await api('sa_company', { id: c.id, addDays: 30 }); CS.toast(c.name + ': 30 gün eklendi.'); await load(); } catch (e) { CS.toast(e.message, 'bad'); } }
+    };
+    let filt = '';
+    const build = () => { const v = filt; opts.rows = C.filter((c) => !v || (v === 'active' && !c.license.expired && !c.license.suspended) || (v === 'soon' && !c.license.expired && c.license.daysLeft != null && c.license.daysLeft <= 7) || (v === 'expired' && c.license.expired) || (v === 'suspended' && c.license.suspended)); CS.table($('#ft', body), opts); const fs = $('#fs', body); fs.value = filt; fs.onchange = (e) => { filt = e.target.value; build(); }; };
+    build();
+  }
+  const waNum = (p) => { let d = String(p || '').replace(/\D/g, ''); if (d.startsWith('0')) d = '9' + d; else if (d.length === 10) d = '90' + d; return d; };
+  function edit(c) {
+    const L = c.license; const plans = DATA.site.plans;
+    const m = CS.modal({
+      title: c.name, size: 'lg', body: `<div class="kpis">${CS.kpi('Kalan süre', leftPill(L), 'Bitiş: ' + fmtDate(L.expires), 'hl')}${CS.kpi('Paket', esc(L.planName))}${CS.kpi('Kullanıcı', c.users + (L.maxUsers != null ? ' / ' + L.maxUsers : ''))}${CS.kpi('Son kullanım', ago(c.lastSeen), c.records + ' kayıt · ' + c.products + ' ürün')}</div>
+        <h3>Kullanım süresini uzat</h3><div class="quick">${[[7, '+7 gün'], [15, '+15 gün'], [30, '+1 ay'], [90, '+3 ay'], [180, '+6 ay'], [365, '+1 yıl']].map(([d, l]) => `<button class="btn" data-add="${d}">${l}</button>`).join('')}<button class="btn" data-unl>Sınırsız yap</button></div>
+        <div class="form-grid" style="margin-top:14px">
+          <label class="fld third"><span>Bitiş tarihi</span><input type="date" id="ex" value="${L.expires ? L.expires.slice(0, 10) : ''}"></label>
+          <label class="fld third"><span>Paket</span><select id="pl"><option value="">— Paketsiz —</option>${plans.map((p) => `<option value="${esc(p.id)}" ${p.id === L.plan ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+          <label class="fld third"><span>En fazla kullanıcı (boş = sınırsız)</span><input id="mu" value="${L.maxUsers ?? ''}" inputmode="numeric"></label>
+          <label class="fld third"><span>Firma adı</span><input id="nm" value="${esc(c.name)}"></label>
+          <label class="fld third"><span>Telefon</span><input id="ph" value="${esc(c.phone || '')}"></label>
+          <label class="fld third"><span>Durum</span><select id="st"><option value="active" ${!L.suspended ? 'selected' : ''}>Aktif</option><option value="suspended" ${L.suspended ? 'selected' : ''}>Askıya al (giriş yapamaz)</option></select></label>
+          <label class="fld full"><span>Not (yalnızca siz görürsünüz)</span><input id="nt" value="${esc(c.note || '')}" placeholder="ör. Ödeme havaleyle alındı, faturası kesildi"></label>
+        </div>
+        <h3 style="margin-top:18px">Firma yöneticisinin şifresini sıfırla</h3><div class="row"><input id="np" placeholder="Yeni şifre" style="max-width:220px"><button class="btn" data-rp>Şifreyi değiştir</button></div>
+        <h3 style="margin-top:18px">Firmayı sil</h3><div class="row"><input id="dc" placeholder="Onay için firma kodunu yazın: ${esc(c.code)}" style="flex:1;max-width:360px"><button class="btn danger" data-del>Tüm verileriyle sil</button></div>`,
+      buttons: [{ label: 'Kapat' }, { label: 'Kaydet', kind: 'primary', onClick: async (cl, el) => { try { const exv = $('#ex', el).value || null; const exo = L.expires ? L.expires.slice(0, 10) : null; await api('sa_company', { id: c.id, ...(exv !== exo ? { expires: exv } : {}), plan: $('#pl', el).value, maxUsers: $('#mu', el).value, name: $('#nm', el).value, phone: $('#ph', el).value, status: $('#st', el).value, note: $('#nt', el).value }); CS.toast('Kaydedildi.'); await load(); } catch (e) { CS.toast(e.message, 'bad'); return false; } } }]
+    });
+    m.el.addEventListener('click', async (e) => {
+      const a = e.target.closest('[data-add]'), u = e.target.closest('[data-unl]'), rp = e.target.closest('[data-rp]'), del = e.target.closest('[data-del]');
+      try {
+        if (a) { const r = await api('sa_company', { id: c.id, addDays: +a.dataset.add }); CS.toast(`${a.textContent} eklendi. Yeni bitiş: ${fmtDate(r.license.expires)}`); m.close(); await load(); edit(DATA.companies.find((x) => x.id === c.id)); }
+        if (u) { await api('sa_company', { id: c.id, expires: null }); CS.toast('Süre sınırı kaldırıldı.'); m.close(); await load(); }
+        if (rp) { const r = await api('sa_resetpass', { id: c.id, pass: $('#np', m.el).value }); CS.toast(`“${r.username}” kullanıcısının şifresi değişti.`); }
+        if (del) { if (!confirm(c.name + ' ve tüm verileri kalıcı olarak silinecek. Emin misiniz?')) return; await api('sa_delete', { id: c.id, confirm: $('#dc', m.el).value.trim() }); CS.toast('Firma silindi.'); m.close(); await load(); }
+      } catch (err) { CS.toast(err.message, 'bad', 5000); }
+    });
+  }
+
+  /* ---------- Fiyat tablosu ---------- */
+  function prices(body) {
+    const S = JSON.parse(JSON.stringify(DATA.site));
+    const draw = () => {
+      body.innerHTML = `<div class="grid g2" style="grid-template-columns:1.6fr 1fr;align-items:start"><section><div class="row" style="margin-bottom:10px"><h2 style="margin:0;flex:1;font-size:18px">Paketler</h2><button class="btn" id="addp">${icon('plus', 15)} Paket ekle</button></div><div id="pls"></div></section>
+        <section class="panel"><h2>Genel</h2><div class="form-grid">
+          <label class="fld full"><span>Yeni firmaya deneme süresi (gün, 0 = sınırsız)</span><input id="td" value="${S.trialDays}" inputmode="numeric"></label>
+          <label class="fld full"><span>Yeni firmanın paketi</span><select id="dp">${S.plans.map((p) => `<option value="${esc(p.id)}" ${p.id === S.defaultPlan ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
+          <label class="chk full" style="padding:0"><input type="checkbox" id="ar" ${S.allowRegister ? 'checked' : ''}> Herkes yeni firma kaydı açabilsin</label>
+          <label class="fld full"><span>Fiyat tablosu alt notu</span><input id="pn" value="${esc(S.priceNote || '')}"></label>
+          <h3 class="form-sep">Süre uzatma için iletişim</h3>
+          <label class="fld full"><span>Telefon</span><input id="cp" value="${esc(S.contact.phone || '')}"></label>
+          <label class="fld full"><span>WhatsApp numarası</span><input id="cw" value="${esc(S.contact.whatsapp || '')}" placeholder="05xx…"></label>
+          <label class="fld full"><span>E-posta</span><input id="ce" value="${esc(S.contact.email || '')}"></label>
+          <label class="fld full"><span>Süresi dolan firmaya gösterilecek mesaj</span><textarea id="cn" rows="2">${esc(S.contact.note || '')}</textarea></label>
+        </div><p><button class="btn primary" id="save">Kaydet ve ana sayfada yayınla</button></p><p class="muted">Kaydettiğiniz anda ana sayfadaki fiyat tablosu ve programdaki “Abonelik” ekranı güncellenir.</p></section></div>`;
+      $('#pls', body).innerHTML = S.plans.map((p, i) => `<div class="plan-ed ${p.highlight ? 'hl' : ''}" data-i="${i}"><header><b>${esc(p.name || 'Yeni paket')}</b>${p.hidden ? '<span class="pill">Gizli</span>' : ''}<button class="icon-btn" data-up="${i}" aria-label="Yukarı">${icon('up', 16)}</button><button class="icon-btn" data-dn="${i}" aria-label="Aşağı">${icon('down', 16)}</button><button class="icon-btn danger" data-rm="${i}" aria-label="Sil">${icon('trash', 16)}</button></header>
+        <div class="form-grid">
+          <label class="fld third"><span>Paket adı</span><input data-k="name" value="${esc(p.name)}"></label>
+          <label class="fld third"><span>Fiyat (₺)</span><input data-k="price" value="${p.price}" inputmode="decimal"></label>
+          <label class="fld third"><span>Üstü çizili eski fiyat</span><input data-k="oldPrice" value="${p.oldPrice || ''}" inputmode="decimal"></label>
+          <label class="fld third"><span>Dönem</span><select data-k="period">${[['', 'Tek sefer / ücretsiz'], ['ay', 'Aylık'], ['3 ay', '3 aylık'], ['6 ay', '6 aylık'], ['yıl', 'Yıllık']].map(([v, l]) => `<option value="${v}" ${p.period === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <label class="fld third"><span>Süre (ay, uzatmada kullanılır)</span><input data-k="months" value="${p.months || 0}" inputmode="numeric"></label>
+          <label class="fld third"><span>En fazla kullanıcı</span><input data-k="maxUsers" value="${p.maxUsers ?? ''}" inputmode="numeric" placeholder="sınırsız"></label>
+          <label class="fld full"><span>Kısa açıklama</span><input data-k="desc" value="${esc(p.desc || '')}"></label>
+          <label class="fld third"><span>Düğme yazısı</span><input data-k="cta" value="${esc(p.cta || '')}"></label>
+          <label class="fld third"><span>Kod</span><input data-k="id" value="${esc(p.id)}"></label>
+          <label class="chk third" style="padding-top:22px"><input type="checkbox" data-k="highlight" ${p.highlight ? 'checked' : ''}> Öne çıkar</label>
+          <label class="fld full"><span>Özellikler (her satıra bir tane; karşılaştırma tablosu bunlardan oluşur)</span><textarea data-k="features" rows="5">${esc((p.features || []).join('\n'))}</textarea></label>
+          <label class="chk full" style="padding:0"><input type="checkbox" data-k="hidden" ${p.hidden ? 'checked' : ''}> Ana sayfada gösterme</label>
+        </div></div>`).join('');
+      body.oninput = body.onchange = (e) => { const box = e.target.closest('[data-i]'); const k = e.target.dataset.k; if (!box || !k) return; const p = S.plans[+box.dataset.i]; if (e.target.type === 'checkbox') { if (k === 'highlight' && e.target.checked) S.plans.forEach((x) => (x.highlight = false)); p[k] = e.target.checked; if (k === 'highlight') draw(); } else if (k === 'features') p.features = e.target.value.split('\n'); else if (['price', 'oldPrice'].includes(k)) p[k] = CS.num(e.target.value); else p[k] = e.target.value; };
+      body.onclick = async (e) => {
+        const up = e.target.closest('[data-up]'), dn = e.target.closest('[data-dn]'), rm = e.target.closest('[data-rm]');
+        if (up && +up.dataset.up > 0) { const i = +up.dataset.up; [S.plans[i - 1], S.plans[i]] = [S.plans[i], S.plans[i - 1]]; draw(); }
+        if (dn && +dn.dataset.dn < S.plans.length - 1) { const i = +dn.dataset.dn; [S.plans[i + 1], S.plans[i]] = [S.plans[i], S.plans[i + 1]]; draw(); }
+        if (rm && confirm('Paket silinsin mi?')) { S.plans.splice(+rm.dataset.rm, 1); draw(); }
+        if (e.target.id === 'addp') { S.plans.push({ id: 'paket' + (S.plans.length + 1), name: 'Yeni paket', price: 0, period: 'ay', months: 1, maxUsers: null, desc: '', cta: 'Hemen başla', features: [], highlight: false }); draw(); }
+        if (e.target.id === 'save') {
+          Object.assign(S, { trialDays: CS.num($('#td', body).value), defaultPlan: $('#dp', body).value, allowRegister: $('#ar', body).checked, priceNote: $('#pn', body).value, contact: { phone: $('#cp', body).value, whatsapp: $('#cw', body).value, email: $('#ce', body).value, note: $('#cn', body).value } });
+          try { const r = await api('sa_site', { site: S }); DATA.site = r.site; CS.toast('Fiyat tablosu yayınlandı.'); } catch (err) { CS.toast(err.message, 'bad'); }
+        }
+      };
+    };
+    draw();
+  }
+
+  function account(body) {
+    body.innerHTML = `<section class="panel" style="max-width:520px"><h2>Yönetici şifresini değiştir</h2><div class="form-grid"><label class="fld full"><span>Kullanıcı adı</span><input id="au"></label><label class="fld full"><span>Yeni şifre (en az 8 karakter)</span><input id="ap" type="password"></label></div><p><button class="btn primary" id="ok">Kaydet</button></p><p class="muted">Bu panelin adresi: <b>${esc(location.href.split('#')[0])}</b>. Adresi kimseyle paylaşmayın.</p></section>`;
+    $('#ok', body).onclick = async () => { try { await api('sa_password', { user: $('#au', body).value, pass: $('#ap', body).value }); CS.toast('Şifre değişti.'); } catch (e) { CS.toast(e.message, 'bad'); } };
+  }
+  start();
+})();
+</script>
+</body>
+</html>

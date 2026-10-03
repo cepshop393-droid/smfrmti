@@ -1,0 +1,28 @@
+# CepStok
+DirectoryIndex index.html
+Options -Indexes
+AddDefaultCharset UTF-8
+
+# Veritabanı klasörü ve ayar dosyası dışarıdan okunamaz
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^data/ - [F,L]
+  # HTTPS'e yönlendirmek için (SSL kurulduktan sonra) aşağıdaki iki satırın başındaki # işaretini kaldırın:
+  # RewriteCond %{HTTPS} off
+  # RewriteRule ^ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+</IfModule>
+<FilesMatch "^(config\.php|.*\.sqlite.*)$">
+  <IfModule mod_authz_core.c>
+    Require all denied
+  </IfModule>
+  <IfModule !mod_authz_core.c>
+    Order allow,deny
+    Deny from all
+  </IfModule>
+</FilesMatch>
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  <FilesMatch "sw\.js$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

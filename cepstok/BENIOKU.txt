@@ -1,0 +1,53 @@
+CepStok — Stok takip, barkodlu satış ve ön muhasebe programı
+=============================================================
+
+HOSTİNGE KURULUM (cPanel)
+1. cPanel > Dosya Yöneticisi > public_html klasörüne cepstok.zip dosyasını yükleyin ve "Çıkart" deyin.
+   (Eski CepStok dosyaları varsa üzerine yazılsın.)
+2. Tarayıcıda https://alanadiniz.com/app.html adresini açın.
+3. "Yeni firma oluştur" deyin: firma adı, firma kodu, kullanıcı adı ve şifre girin.
+   Deneme için "Örnek verilerle başlat" seçebilirsiniz.
+4. Personel eklemek için: Ayarlar > Kullanıcılar > Kullanıcı ekle.
+   Alış fiyatı ve kârı görmemesi için rolü "Personel (maliyet görmez)" seçin.
+   Personel kendi telefonundan aynı adrese girip firma kodu + kendi kullanıcı adı/şifresiyle oturum açar.
+
+YÖNETİM PANELİ (site sahibi)
+- Adres: https://alanadiniz.com/yonetim.html
+- İlk açılışta kendi yönetici kullanıcı adınızı ve şifrenizi (en az 8 karakter) oluşturun. Yükledikten hemen sonra yapın.
+- Buradan: firmaların kalan kullanım süresi, +7 gün / +1 ay / +1 yıl uzatma, bitiş tarihi, paket, kullanıcı sınırı,
+  askıya alma, firma yöneticisinin şifresini sıfırlama, firma silme.
+- "Fiyat tablosu ve paketler" sekmesinden ana sayfadaki fiyatları, özellikleri, deneme süresini (varsayılan 30 gün)
+  ve WhatsApp numarasını (varsayılan +90 534 491 45 30) değiştirirsiniz. Kaydettiğiniz anda ana sayfa güncellenir.
+- Süresi dolan firma programı açınca kapatılamaz bir uyarı görür ve WhatsApp'a yönlendirilir. Verileri silinmez;
+  süreyi uzattığınızda kaldığı yerden devam eder.
+
+EXCEL'DEN VERİ ALMA
+Programda sol menü > Excel'den veri al: ürünler, fiyat güncelleme, stok/sayım, cariler ve bayiler,
+cari bakiyeleri, kasa/banka hareketleri ve geçmiş faturalar. Sütun adları farklı olsa da eşleştirilir.
+
+Kurulum kontrolü: https://alanadiniz.com/api.php?a=check  (PHP, veritabanı ve kur bağlantısını gösterir)
+
+VERİTABANI
+- Varsayılan: SQLite. Kurulum gerektirmez; veriler public_html/data/cepstok.sqlite dosyasında tutulur
+  ve dışarıdan erişime kapalıdır (.htaccess).
+- İsterseniz MySQL: cPanel > MySQL Veritabanları'ndan veritabanı + kullanıcı oluşturun,
+  config.php içinde 'db' => 'mysql' yapıp bilgileri girin.
+- Yedek: data klasörünü indirin ya da programda Ayarlar > Yedekleme > Yedek dosyası indir.
+
+YENİ FİRMA KAYDINI KAPATMAK
+config.php içinde 'allow_register' => false yapın. 'register_key' doldurursanız yalnızca
+o anahtarı bilen kişi yeni firma açabilir.
+
+DÖVİZ KURU
+Dolar/euro kuru Harem Altın'dan (ulaşılamazsa TCMB'den) 5 dakikada bir alınır.
+Hostinginiz dış bağlantıya izin vermezse Ayarlar > Genel > Döviz kurları bölümünden elle kur girin.
+
+ORTAK BARKOD HAVUZU
+Bir işletmenin tanımladığı barkodun yalnızca ürün adı, birimi, kategorisi ve markası havuza yazılır.
+Başka bir işletme o barkodu okuttuğunda ürün adını görür; fiyat, stok ve firma bilgisi asla paylaşılmaz.
+
+DOSYALAR
+app.html / index.html    program ve tanıtım sitesi
+api.php / config.php     sunucu (PHP 7.4+)
+assets/js/*              program modülleri
+data/                    veritabanı (otomatik oluşur)

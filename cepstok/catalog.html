@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Ürün kataloğu</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#15252C;--muted:#64767d;--paper:#EEF2F0;--surface:#fff;--line:#D5DDD9;--brand:#0F5257;--tag:#F4C21B;--tag-ink:#2B2200;--bad:#BF3A2B}
+@media (prefers-color-scheme:dark){:root{--ink:#E4EDEF;--muted:#9fb0b5;--paper:#0E181C;--surface:#152329;--line:#2A3D44;--brand:#47A7A0}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.45 Archivo,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-variant-numeric:tabular-nums}
+header{background:var(--brand);color:#fff;padding:18px 16px}
+header h1{margin:0;font-size:24px;font-stretch:115%}
+header p{margin:4px 0 0;opacity:.85;max-width:70ch}
+.bar{position:sticky;top:0;z-index:5;background:var(--surface);border-bottom:1px solid var(--line);padding:10px 16px;display:flex;gap:8px;flex-wrap:wrap}
+input,select,textarea{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:6px;height:38px;padding:0 10px}
+textarea{height:auto;padding:8px 10px;width:100%}
+.bar input{flex:1;min-width:180px}
+main{padding:16px;display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:12px;max-width:1300px;margin:0 auto 120px}
+.p{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.p img{width:100%;height:140px;object-fit:cover;border-radius:6px;background:var(--paper)}
+.p .ph{height:140px;border-radius:6px;background:var(--paper);display:grid;place-items:center;color:var(--muted);font-size:34px;font-weight:800}
+.p b{font-size:14.5px}
+.p small{color:var(--muted)}
+.price{align-self:flex-start;background:var(--tag);color:var(--tag-ink);font-weight:800;padding:2px 16px 2px 8px;clip-path:polygon(0 0,88% 0,100% 50%,88% 100%,0 100%)}
+.qty{display:flex;gap:4px;margin-top:auto}
+.qty input{width:56px;text-align:center}
+.qty button{flex:1;white-space:nowrap;padding:0 8px}
+button{font:inherit;cursor:pointer;border-radius:6px;border:1px solid var(--line);background:var(--surface);color:var(--ink);height:38px;padding:0 12px;font-weight:600}
+button.pr{background:var(--brand);color:#fff;border-color:var(--brand)}
+.cart{position:fixed;left:0;right:0;bottom:0;background:var(--surface);border-top:1px solid var(--line);padding:12px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between;box-shadow:0 -8px 24px rgba(0,0,0,.08)}
+.cart b{font-size:20px}
+dialog{border:0;border-radius:12px;padding:0;width:min(560px,94vw);background:var(--surface);color:var(--ink)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dlg{padding:18px;display:flex;flex-direction:column;gap:10px}
+.dlg h2{margin:0}
+.ln{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:6px 0}
+.out{color:var(--bad);font-weight:600}
+.empty{grid-column:1/-1;text-align:center;color:var(--muted);padding:40px}
+</style>
+</head>
+<body>
+<header><h1 id="t">Ürün kataloğu</h1><p id="n"></p></header>
+<div class="bar"><input id="q" type="search" placeholder="Ürün ara" aria-label="Ürün ara"><select id="c" aria-label="Kategori"><option value="">Tüm kategoriler</option></select></div>
+<main id="list"></main>
+<div class="cart"><span><span id="cc">0</span> ürün · <b id="ct">0,00 ₺</b></span><button class="pr" id="go">Siparişi gönder</button></div>
+<dialog id="dlg"><form class="dlg" method="dialog" id="fm"><h2>Siparişi tamamla</h2><div id="sum"></div><input id="nm" placeholder="Ad soyad / firma" required><input id="ph" placeholder="Telefon" required inputmode="tel"><textarea id="ad" rows="2" placeholder="Teslimat adresi"></textarea><textarea id="nt" rows="2" placeholder="Not"></textarea><div style="display:flex;gap:8px;justify-content:flex-end"><button value="cancel" type="button" id="cx">Vazgeç</button><button class="pr" id="send" type="submit">Gönder</button></div></form></dialog>
+<script>
+const EMBED = /*__CATALOG_DATA__*/null;
+</script>
+<script src="assets/js/core.js" onerror="void 0"></script>
+<script src="assets/js/demo.js" onerror="void 0"></script>
+<script src="assets/js/m-pos.js" onerror="void 0"></script>
+<script src="assets/js/m-contacts.js" onerror="void 0"></script>
+<script src="assets/js/m-docs.js" onerror="void 0"></script>
+<script>
+(function(){
+  const f=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2}); const m=v=>f.format(v)+' ₺';
+  const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  let D=EMBED, local=false;
+  if(!D && window.CS && CS.loadCompany){ try{CS.loadCompany(); D=CS.catalogData(); local=true;}catch(e){console.error(e)} }
+  if(!D){document.getElementById('list').innerHTML='<p class="empty">Katalog verisi bulunamadı.</p>';return}
+  document.title=D.title||D.company; document.getElementById('t').textContent=D.title||D.company; document.getElementById('n').textContent=(D.note||'')+(D.minOrder?` Asgari sipariş: ${m(D.minOrder)}.`:'');
+  const cs=document.getElementById('c'); D.cats.filter(c=>D.products.some(p=>p.cat===c.id)).forEach(c=>cs.insertAdjacentHTML('beforeend',`<option value="${c.id}">${esc(c.name)}</option>`));
+  const cart={};
+  const items=()=>D.products.flatMap(p=>p.variants.length?p.variants.map(v=>({...v,name:p.name+' — '+v.name,unit:p.unit})):[p]);
+  function draw(){const q=document.getElementById('q').value.toLocaleLowerCase('tr-TR'),c=cs.value;const L=D.products.filter(p=>(!c||p.cat===c)&&(!q||p.name.toLocaleLowerCase('tr-TR').includes(q)||p.barcode.includes(q)));
+    document.getElementById('list').innerHTML=L.map(p=>`<article class="p">${p.image?`<img src="${p.image}" alt="">`:`<div class="ph">${esc(p.name[0]||'')}</div>`}<b>${esc(p.name)}</b>${p.desc?`<small>${esc(p.desc)}</small>`:''}${p.variants.length?`<select data-v="${p.id}" aria-label="Seçenek">${p.variants.map(v=>`<option value="${v.id}">${esc(v.name)} — ${m(v.price)}${D.showStock&&v.stock<=0?' (tükendi)':''}</option>`).join('')}</select>`:''}<span class="price">${m(p.price)}</span>${D.showStock?`<small class="${p.stock<=0?'out':''}">${p.stock<=0?'Stokta yok':'Stokta var'}</small>`:''}<div class="qty"><input type="number" min="1" value="1" data-q="${p.id}" aria-label="Adet"><button data-add="${p.id}">Sepete ekle</button></div></article>`).join('')||'<p class="empty">Ürün bulunamadı.</p>'}
+  function upd(){const all=items();let n=0,t=0;for(const k in cart){const it=all.find(x=>x.id===k);if(!it)continue;n+=cart[k];t+=cart[k]*it.price}document.getElementById('cc').textContent=n;document.getElementById('ct').textContent=m(t);return t}
+  document.addEventListener('click',e=>{const b=e.target.closest('[data-add]');if(!b)return;const id=b.dataset.add;const sel=document.querySelector(`[data-v="${id}"]`);const key=sel?sel.value:id;const q=Math.max(1,+document.querySelector(`[data-q="${id}"]`).value||1);cart[key]=(cart[key]||0)+q;upd();b.textContent='Eklendi';setTimeout(()=>b.textContent='Sepete ekle',900)});
+  document.getElementById('q').oninput=draw;cs.onchange=draw;draw();
+  const dlg=document.getElementById('dlg');
+  document.getElementById('go').onclick=()=>{const t=upd();if(!t)return alert('Sepetiniz boş.');if(D.minOrder&&t<D.minOrder)return alert('Asgari sipariş tutarı '+m(D.minOrder));const all=items();document.getElementById('sum').innerHTML=Object.entries(cart).map(([k,q])=>{const it=all.find(x=>x.id===k);return `<div class="ln"><span>${q} × ${esc(it.name)}</span><span>${m(q*it.price)} <button type="button" data-rm="${k}" aria-label="Kaldır">×</button></span></div>`}).join('')+`<div class="ln"><b>Toplam</b><b>${m(t)}</b></div>`;dlg.showModal()};
+  dlg.addEventListener('click',e=>{const r=e.target.closest('[data-rm]');if(r){delete cart[r.dataset.rm];upd();dlg.close();document.getElementById('go').click()}});
+  document.getElementById('cx').onclick=()=>dlg.close();
+  document.getElementById('fm').onsubmit=e=>{e.preventDefault();const all=items();const o={name:document.getElementById('nm').value,phone:document.getElementById('ph').value,address:document.getElementById('ad').value,note:document.getElementById('nt').value,items:Object.entries(cart).map(([k,q])=>{const it=all.find(x=>x.id===k);return{id:k,name:it.name,qty:q,price:it.price}})};
+    if(local&&window.CS){const key='cepstok:inbox:'+CS.companyId;const box=JSON.parse(localStorage.getItem(key)||'[]');box.push(o);localStorage.setItem(key,JSON.stringify(box));dlg.close();for(const k in cart)delete cart[k];upd();alert('Siparişiniz alındı. Teşekkür ederiz.');return}
+    const code=btoa(unescape(encodeURIComponent(JSON.stringify(o))));const txt=`Merhaba, sipariş vermek istiyorum.\n${o.items.map(i=>`${i.qty} × ${i.name} = ${m(i.qty*i.price)}`).join('\n')}\nToplam: ${m(upd())}\n${o.name} · ${o.phone}\n${o.address}\n${o.note}\n\nCEPSTOK-SIPARIS:${code}`;
+    window.open('https://wa.me/'+(D.whatsapp||'')+'?text='+encodeURIComponent(txt),'_blank');dlg.close()};
+})();
+</script>
+</body>
+</html>

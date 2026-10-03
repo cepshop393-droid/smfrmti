@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Müşteri ekranı — CepStok</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{--ink:#15252C;--paper:#EEF2F0;--brand:#0F5257;--tag:#F4C21B;--tag-ink:#2B2200}
+*{box-sizing:border-box}
+body{margin:0;height:100vh;display:grid;grid-template-rows:auto 1fr auto;font:18px/1.4 Archivo,system-ui,sans-serif;background:var(--paper);color:var(--ink);font-variant-numeric:tabular-nums}
+header{background:var(--brand);color:#fff;padding:18px 28px;font-size:26px;font-weight:800;font-stretch:120%}
+main{overflow:auto;padding:10px 28px}
+table{width:100%;border-collapse:collapse}
+td{padding:12px 6px;border-bottom:1px solid #d5ddd9;font-size:22px}
+td.q{color:#5f6f76;width:140px}
+td.t{text-align:right;font-weight:700;width:200px}
+tr:last-child td{background:#fff}
+footer{display:flex;justify-content:space-between;align-items:center;background:var(--tag);color:var(--tag-ink);padding:22px 60px 22px 28px;clip-path:polygon(0 0,calc(100% - 36px) 0,100% 50%,calc(100% - 36px) 100%,0 100%);margin:0 20px 20px 0}
+footer span{font-size:26px;font-weight:700}
+footer b{font-size:64px;font-weight:800;font-stretch:118%;letter-spacing:-.02em}
+.idle{display:grid;place-items:center;height:100%;text-align:center;color:#5f6f76;font-size:28px}
+.done{font-size:40px;color:var(--brand);font-weight:800}
+</style>
+</head>
+<body>
+<header id="co">CepStok</header>
+<main id="m"><div class="idle">Hoş geldiniz</div></main>
+<footer><span id="lbl">Toplam</span><b id="tot">0,00 ₺</b></footer>
+<script>
+const f=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+let timer;
+try{
+  const bc=new BroadcastChannel('cepstok-display');
+  bc.onmessage=e=>{
+    const d=e.data; document.getElementById('co').textContent=d.company||'CepStok'; clearTimeout(timer);
+    if(d.done){document.getElementById('m').innerHTML=`<div class="idle"><div><div class="done">Teşekkür ederiz</div>${d.change?'<p>Para üstü: <b>'+f.format(d.change)+' ₺</b></p>':''}<p>${esc(d.footer||'')}</p></div></div>`;document.getElementById('tot').textContent=f.format(d.total)+' ₺';timer=setTimeout(()=>{document.getElementById('m').innerHTML='<div class="idle">Hoş geldiniz</div>';document.getElementById('tot').textContent='0,00 ₺'},8000);return}
+    document.getElementById('lbl').textContent=d.ret?'İade tutarı':'Toplam';
+    document.getElementById('m').innerHTML=d.lines.length?`<table>${d.lines.map(l=>`<tr><td>${esc(l.name)}</td><td class="q">${l.qty} ${esc(l.unit)}</td><td class="t">${f.format(l.total)} ₺</td></tr>`).join('')}</table>`:'<div class="idle">Hoş geldiniz</div>';
+    document.getElementById('tot').textContent=f.format(d.total)+' ₺';
+    const m=document.getElementById('m'); m.scrollTop=m.scrollHeight;
+  };
+}catch(e){document.getElementById('m').innerHTML='<div class="idle">Bu tarayıcı müşteri ekranını desteklemiyor.</div>'}
+</script>
+</body>
+</html>

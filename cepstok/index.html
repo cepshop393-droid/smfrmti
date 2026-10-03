@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CepStok — Stok takip, barkodlu satış ve ön muhasebe programı</title>
+<meta name="description" content="CepStok ile barkodlu satış, stok ve depo takibi, cari hesap, fatura ve e-belge, kasa-banka, çek-senet, personel ve raporlar tek programda.">
+<meta name="theme-color" content="#0F5257">
+<link rel="icon" href="assets/img/icon.svg" type="image/svg+xml">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+:root{--paper:#EEF2F0;--surface:#fff;--ink:#15252C;--ink2:#41545C;--muted:#64767D;--line:#D5DDD9;--brand:#0F5257;--brand2:#0B3E42;--tag:#F4C21B;--tag-ink:#2B2200;--ok:#17784C;--soft:#DCEBEA}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--paper:#0E181C;--surface:#152329;--ink:#E4EDEF;--ink2:#B5C5CA;--muted:#8A9DA3;--line:#2A3D44;--brand:#2F8C86;--brand2:#0B2A2D;--soft:#173A3B}}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font:17px/1.55 Archivo,system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper);font-variant-numeric:tabular-nums}
+a{color:inherit}
+:focus-visible{outline:2px solid var(--tag);outline-offset:3px}
+.wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+.btn{display:inline-flex;align-items:center;gap:8px;height:48px;padding:0 22px;border-radius:8px;font-weight:700;text-decoration:none;border:2px solid transparent;font-size:16px;cursor:pointer}
+.btn.tag{background:var(--tag);color:var(--tag-ink)}
+.btn.line{border-color:currentColor}
+.btn:hover{filter:brightness(1.06)}
+/* üst */
+.nav{background:var(--brand2);color:#fff}
+.nav .wrap{display:flex;align-items:center;gap:24px;height:64px}
+.logo{display:flex;align-items:center;gap:8px;font-weight:800;font-size:22px;font-stretch:125%;text-decoration:none;letter-spacing:-.02em}
+.logo i{display:inline-grid;place-items:center;width:32px;height:24px;background:var(--tag);color:var(--tag-ink);font-style:normal;font-size:13px;clip-path:polygon(0 0,82% 0,100% 50%,82% 100%,0 100%);padding-right:5px}
+.nav nav{display:flex;gap:22px;margin-left:auto}
+.nav nav a{text-decoration:none;opacity:.85;font-weight:550}
+.nav nav a:hover{opacity:1}
+.nav .btn{height:40px;margin-left:auto}
+.nav nav+.btn{margin-left:0}
+/* hero */
+.hero{background:var(--brand2);color:#fff;padding:56px 0 80px;overflow:hidden}
+.hero .wrap{display:grid;grid-template-columns:1.05fr .95fr;gap:56px;align-items:center}
+.hero h1{font-size:clamp(40px,6vw,76px);line-height:.98;font-stretch:125%;font-weight:800;letter-spacing:-.035em;margin:0 0 22px}
+.hero p.lead{font-size:20px;max-width:34ch;color:#cfe3e1;margin:0 0 30px}
+.hero .ctas{display:flex;gap:12px;flex-wrap:wrap}
+.hero small{display:block;margin-top:16px;color:#9fc3bf;font-size:14px}
+/* demo kasa */
+.till{background:var(--surface);color:var(--ink);border-radius:14px;box-shadow:0 30px 70px rgba(0,0,0,.35);overflow:hidden}
+.till-top{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);font-size:14px;color:var(--muted)}
+.till-top b{color:var(--ink)}
+.chips{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;padding:14px 16px;background:var(--paper)}
+.chip{border:1px solid var(--line);background:var(--surface);color:var(--ink);border-radius:8px;padding:10px 8px;text-align:left;cursor:pointer;font:inherit;font-size:13.5px;font-weight:600;display:flex;flex-direction:column;gap:6px}
+.chip span{align-self:flex-start;background:var(--tag);color:var(--tag-ink);padding:0 12px 0 6px;font-weight:800;clip-path:polygon(0 0,86% 0,100% 50%,86% 100%,0 100%)}
+.chip:active{transform:scale(.97)}
+.rcpt{min-height:176px;max-height:176px;overflow:auto;padding:6px 16px}
+.rl{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed var(--line);font-size:15px}
+.rl.new{animation:in .35s ease-out}
+@keyframes in{from{background:var(--soft)}}
+.rl em{font-style:normal;color:var(--muted);margin-left:6px}
+.empty{color:var(--muted);text-align:center;padding:60px 0;font-size:15px}
+.total{display:flex;justify-content:space-between;align-items:center;margin:6px 0 0;background:var(--tag);color:var(--tag-ink);padding:14px 40px 14px 16px;clip-path:polygon(0 0,calc(100% - 22px) 0,100% 50%,calc(100% - 22px) 100%,0 100%)}
+.total b{font-size:34px;font-weight:800;font-stretch:118%;letter-spacing:-.02em}
+.till-pay{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;padding:12px 16px 16px}
+.till-pay button{height:44px;border-radius:8px;border:1px solid var(--line);background:var(--paper);color:var(--ink);font:inherit;font-weight:700;cursor:pointer}
+.till-pay button:first-child{background:var(--ok);border-color:var(--ok);color:#fff}
+.till-pay button:nth-child(2){background:var(--brand);border-color:var(--brand);color:#fff}
+.done{font-size:14px;color:var(--ok);font-weight:700;min-height:20px;padding:0 16px 12px}
+/* bölümler */
+section.s{padding:84px 0}
+.s h2{font-size:clamp(30px,4vw,46px);line-height:1.05;font-stretch:118%;letter-spacing:-.025em;margin:0 0 14px;max-width:22ch}
+.s p.intro{color:var(--ink2);max-width:62ch;margin:0 0 40px}
+.mods{display:grid;grid-template-columns:repeat(2,1fr);border-top:2px solid var(--ink)}
+.mod{padding:28px 28px 30px 0;border-bottom:1px solid var(--line)}
+.mod:nth-child(2n){padding-left:28px;padding-right:0;border-left:1px solid var(--line)}
+.mod h3{font-size:22px;font-stretch:112%;margin:0 0 4px}
+.mod p{margin:0 0 12px;color:var(--ink2)}
+.mod ul{margin:0;padding:0;list-style:none;columns:2;column-gap:24px;font-size:15px}
+.mod li{padding:3px 0 3px 16px;position:relative;break-inside:avoid}
+.mod li::before{content:"";position:absolute;left:0;top:12px;width:7px;height:7px;background:var(--tag);clip-path:polygon(0 0,70% 0,100% 50%,70% 100%,0 100%)}
+.band{background:var(--brand);color:#fff}
+.band p.intro{color:#cfe3e1}
+.logos{display:flex;flex-wrap:wrap;gap:10px}
+.logos span{border:1px solid rgba(255,255,255,.3);border-radius:30px;padding:6px 14px;font-size:15px}
+.logos h4{flex-basis:100%;margin:22px 0 2px;font-size:14px;font-weight:600;color:#9fc3bf}
+.steps{display:grid;grid-template-columns:repeat(3,1fr);gap:28px;counter-reset:s}
+.steps div{border-top:2px solid var(--ink);padding-top:16px}
+.steps div::before{counter-increment:s;content:counter(s);display:block;font-size:56px;font-weight:800;font-stretch:125%;line-height:1;color:var(--brand);margin-bottom:8px}
+.steps h3{margin:0 0 6px;font-size:21px}
+.steps p{margin:0;color:var(--ink2)}
+.plans{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.plan{background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:26px;display:flex;flex-direction:column;gap:10px}
+.plan.hl{border:2px solid var(--brand)}
+.plan h3{margin:0;font-size:22px}
+.plan .price{font-size:40px;font-weight:800;font-stretch:115%;letter-spacing:-.02em}
+.plan .price small{font-size:16px;font-weight:500;color:var(--muted)}
+.plan ul{margin:6px 0 14px;padding-left:18px;color:var(--ink2);font-size:15.5px;flex:1}
+.plan .btn{justify-content:center}
+.plan .btn.line{color:var(--brand)}
+.plan .price s{font-size:20px;color:var(--muted);font-weight:500;margin-right:6px}
+.plan .pdesc{color:var(--muted);margin:-4px 0 0;font-size:15px}
+.cmp{width:100%;border-collapse:collapse;margin-top:28px;font-size:15px;background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.cmp th,.cmp td{padding:11px 14px;border-bottom:1px solid var(--line);text-align:center}
+.cmp th:first-child,.cmp td:first-child{text-align:left}
+.cmp thead th{background:var(--brand2);color:#fff;font-weight:700}
+.cmp thead th.hl{background:var(--tag);color:var(--tag-ink)}
+.cmp td.y{color:var(--ok);font-weight:800}
+.cmp td.n{color:var(--muted)}
+.cmp-wrap{overflow-x:auto}
+.btn.wa{background:#1FA855;color:#fff}
+.faq details{border-bottom:1px solid var(--line);padding:16px 0}
+.faq summary{cursor:pointer;font-weight:700;font-size:19px}
+.faq p{color:var(--ink2);max-width:70ch;margin:10px 0 0}
+footer{background:var(--brand2);color:#cfe3e1;padding:44px 0;font-size:15px}
+footer .wrap{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap}
+@media (max-width:900px){.hero .wrap{grid-template-columns:1fr}.mods{grid-template-columns:1fr}.mod,.mod:nth-child(2n){padding:24px 0;border-left:0}.steps,.plans{grid-template-columns:1fr}.nav nav{display:none}}
+@media (max-width:520px){.mod ul{columns:1}.chips{grid-template-columns:repeat(2,1fr)}.hero{padding-top:36px}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+</style>
+</head>
+<body>
+<header class="nav"><div class="wrap"><a class="logo" href="#"><i>₺</i>CepStok</a><nav aria-label="Sayfa"><a href="#ozellikler">Özellikler</a><a href="#entegrasyon">Entegrasyonlar</a><a href="#fiyat">Fiyat tablosu</a><a href="#sss">Sorular</a></nav><a class="btn tag" href="app.html">Programı aç</a></div></header>
+
+<section class="hero"><div class="wrap">
+  <div>
+    <h1>Rafınızdaki her ürün, cebinizde.</h1>
+    <p class="lead">Barkodlu satış, stok ve depo, cari hesap, fatura ve e-belge, kasa-banka, çek-senet, personel ve 42 hazır rapor tek programda.</p>
+    <div class="ctas"><a class="btn tag" href="app.html">30 gün ücretsiz dene</a><a class="btn line" href="#ozellikler">Neler yapabildiğine bak</a></div>
+    <small>Kurulum yok. Bilgisayar, tablet ve telefonda tarayıcıdan çalışır; tüm cihazlar aynı veritabanını görür, internet kesilse de satış devam eder.</small>
+  </div>
+  <div class="till" aria-label="Satış ekranı denemesi">
+    <div class="till-top"><span>Sepet 1 · Perakende müşteri</span><b>Bir ürüne dokunun</b></div>
+    <div class="chips" id="chips"></div>
+    <div class="rcpt" id="rcpt" aria-live="polite"><p class="empty">Barkod okutun ya da bir ürün seçin.</p></div>
+    <div class="total"><span>Toplam</span><b id="tot">0,00 ₺</b></div>
+    <div class="till-pay"><button data-pay="Nakit">Nakit</button><button data-pay="Kart">Kart</button><button data-pay="Açık hesap">Açık hesap</button></div>
+    <div class="done" id="done"></div>
+  </div>
+</div></section>
+
+<section class="s" id="ozellikler"><div class="wrap">
+  <h2>Bir dükkânın bütün işi, tek ekranda</h2>
+  <p class="intro">Kasadan depoya, tedarikçiden muhasebeciye kadar her adım birbirine bağlı: satış yaptığınızda stok düşer, cari borçlanır, kasa artar ve rapor kendiliğinden güncellenir.</p>
+  <div class="mods">
+    <div class="mod"><h3>Hızlı satış ve kasa</h3><p>Barkod okuyucu, dokunmatik ekran ve klavye kısayollarıyla saniyeler içinde satış.</p><ul><li>8 müşteriye aynı anda açık sepet</li><li>Barkod, çarpanlı okutma (3*barkod)</li><li>Terazi barkodu (ağırlık / fiyat)</li><li>Kamera ile barkod okuma</li><li>Hızlı ürün ve kategori butonları</li><li>Nakit, kart, havale, yemek kartı</li><li>Parçalı ödeme ve açık hesap</li><li>Para üstü hesabı</li><li>Satır ve genel indirim</li><li>İade modu</li><li>Satış bekletme</li><li>Fiyat gör</li><li>Müşteri ekranı (ikinci ekran)</li><li>58/80 mm fiş yazdırma</li><li>Kasa açılış, X ve Z raporu</li><li>Kasa giriş-çıkış</li><li>F1–F12 kısayolları</li><li>Satış personeli seçimi</li></ul></div>
+    <div class="mod"><h3>Stok ve depo</h3><p>Hangi üründen hangi depoda ne kadar olduğunu anlık görün.</p><ul><li>Sınırsız ürün ve kategori</li><li>Dolar, euro ve TL ile ürün</li><li>Harem Altın kuruyla otomatik fiyat</li><li>Kâr marjından otomatik satış fiyatı</li><li>3 ayrı bayi fiyatı</li><li>Ağırlıklı ortalama maliyet</li><li>Ortak barkod havuzu</li><li>Alındığı yere göre barkod</li><li>Varyantlı ürün (beden, renk…)</li><li>Çoklu barkod, stok kodu, raf yeri</li><li>Çoklu fiyat listesi (perakende, toptan, bayi)</li><li>Kritik ve azami stok uyarısı</li><li>Çoklu depo: şube, personel, araç</li><li>Depolar arası transfer</li><li>Barkodla stok sayımı, kör sayım</li><li>Sayım farkını stoğa işleme</li><li>Fire, zayi ve stok düzeltme</li><li>Excel ile toplu ürün yükleme</li><li>Toplu fiyat güncelleme ve yuvarlama</li><li>Fiyat değişim geçmişi</li><li>Barkod ve raf etiketi yazdırma</li><li>EAN-13 barkod üretme</li><li>Hazır ürün kütüphanesi</li><li>Ürün görseli</li><li>Hizmet (stoksuz) ürünler</li></ul></div>
+    <div class="mod"><h3>Cari hesap</h3><p>Müşteri ve tedarikçi bakiyeleri, vadeler ve tahsilatlar tek yerde.</p><ul><li>Müşteri ve tedarikçi kartları</li><li>Bayi konumu ve ziyaret kaydı</li><li>Yakınımdaki bayiler, yol tarifi</li><li>Bayi raporu: satış, kâr, ödeme</li><li>VKN ve TCKN doğrulama</li><li>Açılış bakiyesi ve devir</li><li>Hesap ekstresi (PDF, Excel)</li><li>Tahsilat ve ödeme makbuzu</li><li>Risk limiti ve vade günü</li><li>Müşteriye özel fiyat ve iskonto</li><li>Cariler arası virman</li><li>Vadesi geçmiş alacak listesi</li><li>WhatsApp, SMS, e-posta hatırlatma</li><li>Toplu ödeme hatırlatması</li><li>Ekstre paylaşma</li><li>Cari ve BA/BS mutabakat mektubu</li><li>İletişim geçmişi</li><li>Cari kategorileri</li><li>Excel ile cari aktarımı</li></ul></div>
+    <div class="mod"><h3>Fatura, e-belge, sipariş</h3><p>Tekliften faturaya, siparişten kargoya kadar belge akışı.</p><ul><li>Satış ve alış faturası</li><li>Satıştan ve alıştan iade</li><li>Sevk ve alış irsaliyesi</li><li>e-Fatura, e-Arşiv, e-İrsaliye, e-İhracat</li><li>UBL-TR 1.2 XML üretme</li><li>Gelen e-fatura XML aktarımı</li><li>Teklif, müşteri ve tedarikçi siparişi</li><li>Tek tıkla dönüştürme</li><li>Dövizli fatura ve kur</li><li>KDV tevkifatı, ÖTV</li><li>Satır ve genel iskonto</li><li>Rakamla ve yazıyla tutar</li><li>Pazaryeri sipariş takibi</li><li>Kargo firması, takip no, etiket</li><li>Rezerve ve yoldaki stok</li><li>B2B sipariş kataloğu</li></ul></div>
+    <div class="mod"><h3>Para yönetimi</h3><p>Kasa, banka, POS, çek-senet ve krediler bugün ve 13 hafta sonrası için.</p><ul><li>Sınırsız kasa ve banka hesabı</li><li>Kredi kartı ve POS hesapları</li><li>Hesaplar arası virman</li><li>Banka ekstresi yükleme ve otomatik eşleştirme</li><li>POS valör ve komisyon takibi</li><li>Alınan ve verilen çek-senet</li><li>Portföy, tahsil, ciro, karşılıksız</li><li>Çek-senet bordrosu</li><li>Kredi ödeme planı ve taksit takibi</li><li>Vade takvimi</li><li>Nakit akışı tahmini</li><li>Likidite oranı</li></ul></div>
+    <div class="mod"><h3>Gelir, gider ve üretim</h3><p>Masrafları, demirbaşları ve ürettiğiniz ürünlerin maliyetini izleyin.</p><ul><li>Gider ve gelir kategorileri</li><li>Fiş fotoğrafı arşivi</li><li>Düzenli (aylık) giderler</li><li>Yakıt kartı ekstresi aktarımı</li><li>Demirbaş ve amortisman</li><li>Zimmet takibi</li><li>Proje bazlı gelir-gider ve kâr</li><li>Ürün reçetesi (ürün ağacı)</li><li>Kombine ürün satışı</li><li>Üretim kaydı, işçilik maliyeti</li><li>Üretim kapasitesi</li><li>Reçete PDF çıktısı</li></ul></div>
+    <div class="mod"><h3>Personel, şube, yetki</h3><p>Ekibinizi ve şubelerinizi tek hesaptan yönetin.</p><ul><li>Sınırsız kullanıcı</li><li>Rol bazlı yetki (görüntüle, düzenle, sil)</li><li>Personel alış fiyatı ve kârı göremez</li><li>Tüm cihazlarda ortak veritabanı</li><li>Tüm işlemlerin kaydı</li><li>Personel kartı, maaş, avans, prim</li><li>Toplu maaş ve banka talimatı</li><li>Satış primi hesabı</li><li>Personel satış performansı</li><li>İzin takibi</li><li>Çoklu şube, farklı vergi no</li><li>Şube karşılaştırma</li><li>Birden çok firma</li><li>Saha satış (araç deposu)</li></ul></div>
+    <div class="mod"><h3>42 hazır rapor</h3><p>Her rapor Excel, CSV ve PDF olarak indirilebilir.</p><ul><li>Günlük rapor (gün sonu)</li><li>Ürün ve kategori bazlı kâr</li><li>Müşteri ciro raporu</li><li>6 aylık satış eğilimi</li><li>Saatlik satış yoğunluğu</li><li>Satış kaybı raporu</li><li>Hareketsiz ürünler</li><li>Stok devir hızı, ABC analizi</li><li>Stok-satış karşılaştırma</li><li>Alacak ve borç yaşlandırma</li><li>KDV ve BA/BS raporu</li><li>Gelir tablosu ve bilanço</li><li>Kasa-banka ve günlük hareketler</li><li>Çek, senet, kredi raporları</li><li>Personel ve kullanıcı raporları</li><li>Mali müşavir aktarımı</li></ul></div>
+  </div>
+</div></section>
+
+<section class="s band" id="entegrasyon"><div class="wrap">
+  <h2>Kullandığınız cihaz ve servislerle konuşur</h2>
+  <p class="intro">Yazar kasa, e-belge entegratörü, pazaryeri, kargo, banka ve SMS hesaplarınızı tanımlayın. e-Belge XML’i, banka ekstresi, pazaryeri sipariş dosyası, B2B katalog ve muhasebeci aktarımı ilk günden çalışır.</p>
+  <div class="logos">
+    <h4>e-Belge</h4><span>MySoft</span><span>eLogo</span><span>EDM Bilişim</span><span>e-Dönüştür</span><span>Uyumsoft</span><span>GİB e-Arşiv portalı</span>
+    <h4>Yazar kasa POS ve e-Fatura POS</h4><span>INPOS M530</span><span>Ingenico GMP3</span><span>Beko 300TR / X30TR</span><span>Hugin S1</span><span>Paygo SP630 Pro</span><span>Propay</span><span>Ödeal</span><span>Pavo</span>
+    <h4>Pazaryeri ve e-ticaret</h4><span>Trendyol</span><span>Hepsiburada</span><span>n11</span><span>Amazon</span><span>Çiçeksepeti</span><span>Pazarama</span><span>İdefix</span><span>PttAVM</span><span>ikas</span><span>Ticimax</span><span>IdeaSoft</span><span>T-Soft</span><span>WooCommerce</span><span>Shopify</span>
+    <h4>Kargo, tahsilat, SMS</h4><span>Yurtiçi</span><span>Aras</span><span>MNG</span><span>PTT</span><span>Sürat</span><span>HepsiJet</span><span>iyzico</span><span>PayTR</span><span>Param</span><span>Papara</span><span>Netgsm</span><span>İleti Merkezi</span><span>Mutlucell</span><span>Kovann</span>
+  </div>
+</div></section>
+
+<section class="s"><div class="wrap">
+  <h2>Üç adımda satışa başlayın</h2>
+  <div class="steps" style="margin-top:36px">
+    <div><h3>Programı açın</h3><p>Kurulum yapmadan tarayıcıdan açın ya da ana ekrana uygulama olarak ekleyin. Firma bilgilerinizi girin.</p></div>
+    <div><h3>Ürünlerinizi yükleyin</h3><p>Excel’den toplu aktarın, barkodu okutup hazır kütüphaneden ekleyin ya da tek tek tanımlayın.</p></div>
+    <div><h3>Barkodu okutun</h3><p>Satış ekranını açın, okutun, ödemeyi alın. Stok, kasa ve raporlar kendiliğinden güncellenir.</p></div>
+  </div>
+</div></section>
+
+<section class="s" id="fiyat" style="padding-top:0"><div class="wrap">
+  <h2>Fiyat tablosu</h2>
+  <p class="intro" id="trialLine">Kayıt olun, 30 gün ücretsiz kullanın. Kredi kartı istemiyoruz; süre sonunda dilediğiniz paketle devam edersiniz.</p>
+  <div class="plans" id="plans">
+    <div class="plan"><h3>Cep</h3><div class="price">0 ₺</div><ul><li>Hızlı satış ve fiş</li><li>Ürün ve stok takibi</li><li>Ortak barkod havuzu</li><li>Günlük rapor</li></ul><a class="btn line" href="app.html">30 gün ücretsiz dene</a></div>
+    <div class="plan hl"><h3>Esnaf</h3><div class="price">449 ₺ <small>/ ay</small></div><ul><li>Cari, fatura, e-belge XML</li><li>Dolar/TL ürün, otomatik kâr marjı</li><li>3 bayi fiyatı</li><li>Kasa, banka, çek-senet</li><li>Excel içe ve dışa aktarım</li></ul><a class="btn tag" href="app.html">30 gün ücretsiz dene</a></div>
+    <div class="plan"><h3>Ticaret</h3><div class="price">899 ₺ <small>/ ay</small></div><ul><li>Esnaf paketindeki her şey</li><li>Bayi konum ve ziyaret takibi</li><li>Bayi raporu</li><li>Çoklu şube ve depo</li><li>Üretim ve proje takibi</li></ul><a class="btn line" href="app.html">30 gün ücretsiz dene</a></div>
+  </div>
+  <div id="compare"></div>
+  <p class="intro" id="priceNote" style="margin:18px 0 0;font-size:15px">Fiyatlara KDV dahil değildir.</p>
+  <p style="margin-top:14px"><a class="btn wa" id="waBtn" href="https://wa.me/905344914530?text=Merhaba%2C%20CepStok%20hakk%C4%B1nda%20bilgi%20almak%20istiyorum." target="_blank" rel="noopener">WhatsApp’tan bilgi alın: +90 534 491 45 30</a></p>
+</div></section>
+
+<section class="s faq" id="sss" style="padding-top:0"><div class="wrap">
+  <h2>Sık sorulanlar</h2>
+  <details><summary>İnternet kesilirse satış yapabilir miyim?</summary><p>Evet. CepStok verileri cihazınızda tutar; internet olmadan satış, stok ve kasa işlemleri devam eder. Uygulama bir kez açıldıktan sonra çevrimdışı da yüklenir.</p></details>
+  <details><summary>Verilerim nerede saklanıyor, nasıl yedeklerim?</summary><p>Veriler kullandığınız cihazın tarayıcısında saklanır. Ayarlar &gt; Yedekleme bölümünden tek tıkla yedek dosyası indirip istediğiniz yere koyabilir, başka bir cihaza geri yükleyebilirsiniz. Program belirlediğiniz aralıklarla yedek almanızı hatırlatır.</p></details>
+  <details><summary>Hangi barkod okuyucu ve yazıcılarla çalışır?</summary><p>Klavye gibi çalışan tüm USB ve Bluetooth barkod okuyucular, 58 ve 80 mm fiş yazıcılar, etiket yazıcılar ve A4 yazıcılarla çalışır. Telefonda kamerayla barkod okutabilirsiniz.</p></details>
+  <details><summary>e-Fatura kesebilir miyim?</summary><p>Faturalarınız UBL-TR 1.2 standardında XML olarak hazırlanır; özel entegratörünüzün portalına yükleyebilir ya da entegratör bağlantınızı tanımlayabilirsiniz. Gelen e-faturaları XML’den içe aktarabilirsiniz.</p></details>
+  <details><summary>Birden fazla şubem ya da firmam var, ayrı ayrı takip edebilir miyim?</summary><p>Evet. Her şubenin deposu, kasası ve satışları ayrı izlenir, şube karşılaştırma raporu sunulur. Farklı vergi numaralı firmaları ayrı defterler olarak yönetip üst çubuktan geçiş yapabilirsiniz.</p></details>
+  <details><summary>Çalışanlarım her şeyi görebilir mi?</summary><p>Hayır. Kasiyer, saha satış, muhasebe gibi roller tanımlayıp her modül için görüntüleme, düzenleme ve silme yetkisini ayrı ayrı verebilirsiniz. Tüm işlemler kimin yaptığıyla birlikte kaydedilir.</p></details>
+</div></section>
+
+<footer><div class="wrap"><span class="logo" style="color:#fff"><i>₺</i>CepStok</span><span>Stok takip, barkodlu satış ve ön muhasebe programı</span><a href="app.html">Programı aç</a></div></footer>
+
+<script>
+(async function(){
+  const esc=s=>String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const f=new Intl.NumberFormat('tr-TR',{maximumFractionDigits:2});
+  if(!location.protocol.startsWith('http'))return;
+  let S; try{const r=await fetch('api.php?a=site',{method:'POST',cache:'no-store'});S=await r.json();if(!S.ok)return;}catch(e){return}
+  const plans=S.plans.filter(p=>!p.hidden); if(!plans.length)return;
+  const per=p=>p.period?`<small>/ ${esc(p.period)}</small>`:'';
+  document.getElementById('plans').innerHTML=plans.map(p=>`<div class="plan ${p.highlight?'hl':''}"><h3>${esc(p.name)}</h3>${p.desc?`<p class="pdesc">${esc(p.desc)}</p>`:''}<div class="price">${p.oldPrice?`<s>${f.format(p.oldPrice)} ₺</s>`:''}${p.price?f.format(p.price)+' ₺':'Ücretsiz'} ${per(p)}</div><ul>${(p.features||[]).slice(0,6).map(x=>`<li>${esc(x)}</li>`).join('')}${(p.features||[]).length>6?`<li>ve ${p.features.length-6} özellik daha</li>`:''}${p.maxUsers?`<li>${p.maxUsers} kullanıcı</li>`:'<li>Sınırsız kullanıcı</li>'}</ul><a class="btn ${p.highlight?'tag':'line'}" href="app.html">${esc(p.cta||'Hemen başla')}</a></div>`).join('');
+  const feats=[];plans.forEach(p=>(p.features||[]).forEach(x=>{if(!feats.includes(x))feats.push(x)}));
+  if(feats.length&&plans.length>1)document.getElementById('compare').innerHTML=`<div class="cmp-wrap"><table class="cmp"><thead><tr><th>Özellik</th>${plans.map(p=>`<th class="${p.highlight?'hl':''}">${esc(p.name)}</th>`).join('')}</tr></thead><tbody>${feats.map(x=>`<tr><td>${esc(x)}</td>${plans.map(p=>(p.features||[]).includes(x)?'<td class="y">✓</td>':'<td class="n">—</td>').join('')}</tr>`).join('')}<tr><td>Kullanıcı sayısı</td>${plans.map(p=>`<td>${p.maxUsers?p.maxUsers:'Sınırsız'}</td>`).join('')}</tr><tr><td><b>Fiyat</b></td>${plans.map(p=>`<td><b>${p.price?f.format(p.price)+' ₺':'Ücretsiz'}</b> ${p.period?'/ '+esc(p.period):''}</td>`).join('')}</tr></tbody></table></div>`;
+  document.getElementById('trialLine').textContent=S.trialDays?`Kayıt olun, ${S.trialDays} gün ücretsiz kullanın. Kredi kartı istemiyoruz; süre sonunda dilediğiniz paketle devam edersiniz.`:'Kayıt olun ve hemen kullanmaya başlayın.';
+  document.getElementById('priceNote').textContent=S.priceNote||'';
+  const wa=String(S.contact?.whatsapp||'').replace(/\D/g,'');if(wa){const b=document.getElementById('waBtn');b.href='https://wa.me/'+(wa.startsWith('0')?'9'+wa:wa)+'?text='+encodeURIComponent('Merhaba, CepStok hakkında bilgi almak istiyorum.');b.textContent='WhatsApp’tan bilgi alın: '+S.contact.whatsapp;}
+  if(S.trialDays)document.querySelectorAll('.hero .ctas .btn.tag').forEach(b=>b.textContent=S.trialDays+' gün ücretsiz dene');
+})();
+</script>
+<script>
+(function(){
+  const P=[['Su 0,5 L',10],['Ekmek',12.5],['Süt 1 L',38],['Simit',15],['Çay 1 kg',289],['Ayran',18],['Peynir',175],['Makarna',24]];
+  const f=new Intl.NumberFormat('tr-TR',{minimumFractionDigits:2,maximumFractionDigits:2});
+  const chips=document.getElementById('chips'),r=document.getElementById('rcpt'),tot=document.getElementById('tot'),done=document.getElementById('done');
+  let cart=[];
+  chips.innerHTML=P.map((p,i)=>`<button class="chip" data-i="${i}">${p[0]}<span>${f.format(p[1])}</span></button>`).join('');
+  function draw(last){if(!cart.length){r.innerHTML='<p class="empty">Barkod okutun ya da bir ürün seçin.</p>';tot.textContent='0,00 ₺';return}
+    r.innerHTML=cart.map((c,i)=>`<div class="rl ${i===last?'new':''}"><span>${P[c.i][0]}<em>${c.q} × ${f.format(P[c.i][1])}</em></span><b>${f.format(c.q*P[c.i][1])}</b></div>`).join('');
+    tot.textContent=f.format(cart.reduce((s,c)=>s+c.q*P[c.i][1],0))+' ₺';r.scrollTop=r.scrollHeight}
+  chips.onclick=e=>{const b=e.target.closest('[data-i]');if(!b)return;done.textContent='';const i=+b.dataset.i;let k=cart.findIndex(c=>c.i===i);if(k<0){cart.push({i,q:1});k=cart.length-1}else cart[k].q++;draw(k)};
+  document.querySelector('.till-pay').onclick=e=>{const b=e.target.closest('[data-pay]');if(!b||!cart.length)return;done.textContent=`${b.dataset.pay} ile ${tot.textContent} satış tamamlandı. Stok düştü, kasa güncellendi.`;cart=[];setTimeout(()=>draw(),900)};
+  [0,2,1].forEach((i,n)=>setTimeout(()=>{if(!cart.length||n)chips.children[i].click()},700+n*500));
+})();
+</script>
+</body>
+</html>
